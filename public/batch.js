@@ -1,6 +1,6 @@
 'use strict';
 window.rentalBatch=(()=>{
- let syncing=false,loadingList=null,lastMessage='',retryTimer=null;
+ let syncing=false,loadingList=null,lastMessage='',retryTimer=null,idleTimer=null;
  const store=window.rentalLocal;
  const isText=value=>value.trim().length>0&&value.length<=60&&!/[\u0000-\u001f\u007f]/.test(value);
  // A card belongs to its New Location (D) once one is set, otherwise to its Location (B).
@@ -29,12 +29,13 @@ window.rentalBatch=(()=>{
   const id=crypto.randomUUID(),at=Date.now();
   await store.record({id,number:match.number,expected:{row:match.row,card:match.card,location:match.location,checked:match.checked,highlighted:match.highlighted,newLocation:match.newLocation},newLocation:session.location,scannedBy:session.name,createdAt:at},{id,number:match.number,location:session.location,by:session.name,at,session:session.id});
   lastMessage='Saved on this device';await render();
-  if((await store.queue()).filter(x=>!x.conflict).length>=5)void sync(false);
+  clearTimeout(idleTimer);
+  if((await store.queue()).filter(x=>!x.conflict).length>=5)void sync(false);else idleTimer=setTimeout(()=>void sync(true),30000);
  }
  async function sync(manual=true){
   if(syncing)return;
   if(!navigator.locks){lastMessage='Browser update needed for safe sync. Pending entries kept.';await render();return;}
-  syncing=true;clearTimeout(retryTimer);lastMessage='';await render();
+  syncing=true;clearTimeout(retryTimer);clearTimeout(idleTimer);lastMessage='';await render();
   try{await navigator.locks.request('rental-batch-sync',{ifAvailable:true},async lock=>{
    if(!lock){lastMessage='Another tab is syncing';return;}
    do{
