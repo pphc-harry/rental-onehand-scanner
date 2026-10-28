@@ -2,7 +2,7 @@
 
 Production: https://rental-onehand-scanner-20261028.vercel.app/
 
-This repository contains the deployed 03 frontend: camera framing, OCR, full-page review, dark/light themes, IndexedDB checklist and pending confirmations, and five-card batch synchronization.
+This repository contains the 03 frontend: location check sessions (name + location → that location's cards → scan to tick → list of cards not scanned), camera framing, OCR, full-page review, dark/light themes, IndexedDB checklist and pending confirmations, and batch synchronization.
 
 ## Work on a new version
 
@@ -32,7 +32,7 @@ Creating this repository does not connect Vercel Git integration or enable autom
 
 ## Data contract
 
-Exact unique cert match in A; display B current location and E card. Explicit Confirm saves locally first. Every five entries (or Sync now) synchronize C checkbox with #00FF00 and D literal New Location text (up to 60 characters). Preserve B/E and fail closed on schema changes. Avoid moving Sheet rows while scanning. Pending data belongs to the browser origin; a new preview URL has separate storage. Closed pages do not continue syncing. Do not clear browser data until pending entries have synced.
+Each session starts with a scanner name and a location picked from the downloaded list. A card belongs to its D New Location when set, otherwise its B Location. Exact unique cert match in A, and the card must belong to the session location; otherwise nothing is written. Display B (with D when it differs) and E card. Explicit Mark scanned saves locally first. Sync runs every five entries, 30 seconds after the last scan, on Finish, or with Sync now, and writes C checkbox with #00FF00 and D = the session location as literal text (up to 60 characters). The scanner name stays on this device (session records and CSV export) and is not sent to the backend. Preserve B/E and fail closed on schema changes. Avoid moving Sheet rows while scanning. Pending data belongs to the browser origin; a new preview URL has separate storage. Closed pages do not continue syncing. Do not clear browser data until pending entries have synced.
 
 ## Scope and verification
 
