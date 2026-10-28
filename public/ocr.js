@@ -89,6 +89,25 @@ async function detectPass(w,image,seen){
  return out;
 }
 
-async function detect(w,image){const seen=new Set(),out=await detectPass(w,image,seen);if(out.number)seen.add(out.number);return {...out,...(seen.size>1?{number:'',reason:'uncertain',path:'scan-conflict'}:{}),observed:[...seen]};}
+function paddedCanvas(c){
+ const pad=Math.max(24,Math.round(Math.min(c.width,c.height)*.08)),out=document.createElement('canvas');out.width=c.width+pad*2;out.height=c.height+pad*2;
+ const x=out.getContext('2d');x.fillStyle='white';x.fillRect(0,0,out.width,out.height);x.drawImage(c,pad,pad);return out;
+}
+async function recoverEmpty(w,image,out,seen){
+ // Only retry an empty scan. Never override conflicting or ambiguous digits.
+ if(out.number||out.reason!=='empty'||seen.size)return out;
+ const c=makeCanvas(image,2400),attempts=[out.raw];
+ for(const input of [paddedCanvas(c),paddedCanvas(contrast(c))]){
+  const retry=await readNumber(w,input,seen);attempts.push(retry.raw);
+  out={...retry,raw:attempts.join('\n---\n'),path:'empty-recovery'};
+  if(retry.number||retry.reason!=='empty'||seen.size)break;
+ }
+ return out;
+}
+function recordOCR(result){
+ // Keep only the latest bounded diagnostic locally; no photo or cert is stored.
+ try{localStorage.setItem('rental-last-ocr',JSON.stringify({at:new Date().toISOString(),reason:result.reason,path:result.path||'standard',candidateCount:result.candidates?.length||0,conflict:(result.observed?.length||0)>1}));}catch{}
+}
+async function detect(w,image){const seen=new Set();let out=await detectPass(w,image,seen);out=await recoverEmpty(w,image,out,seen);if(out.number)seen.add(out.number);return {...out,...(seen.size>1?{number:'',reason:'uncertain',path:'scan-conflict'}:{}),observed:[...seen]};}
 
 async function detectCGC(w,image){const seen=new Set(),c=makeCanvas(image,2400);let out=await readNumber(w,c,seen);if(out.reason==='empty'){const d=await recognize(w,c,'6'),hits=findCandidates(d);hits.forEach(h=>seen.add(h.number));if(hits.length===1){const check=await recognize(w,region(c,hits[0].bbox),'7','0123456789');const exact=check.text.trim().replace(/\s/g,'');if(/^\d{6,12}$/.test(exact))seen.add(exact);out={number:exact===hits[0].number&&check.confidence>=40&&hits[0].confidence>=40?exact:'',reason:'uncertain',raw:d.text+'\n'+check.text,canvas:c};if(out.number)out.reason='found';}}return {...out,...(seen.size>1?{number:'',reason:'uncertain'}:{}),observed:[...seen]};}
