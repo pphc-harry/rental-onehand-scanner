@@ -2,6 +2,10 @@
 window.rentalBatch=(()=>{
  let syncing=false,loadingList=null,lastMessage='',retryTimer=null;
  const store=window.rentalLocal;
+ const isText=value=>value.trim().length>0&&value.length<=60&&!/[\u0000-\u001f\u007f]/.test(value);
+ // A card belongs to its New Location (D) once one is set, otherwise to its Location (B).
+ const where=row=>String(row.newLocation??'').trim()||String(row.location??'').trim();
+ function locations(snapshot){const counts=new Map();for(const r of snapshot?.rows||[]){const l=where(r);if(isText(l))counts.set(l,(counts.get(l)||0)+1);}return [...counts].map(([name,count])=>({name,count})).sort((a,b)=>a.name.localeCompare(b.name,undefined,{numeric:true}));}
  async function render(){
   const [snapshot,queue]=await Promise.all([store.snapshot(),store.queue()]);
   const conflicts=queue.filter(x=>x.conflict).length;
@@ -10,15 +14,20 @@ window.rentalBatch=(()=>{
   $('sync-now').disabled=syncing||!queue.length;$('refresh-list').disabled=syncing||!!loadingList;
   $('pending-list').replaceChildren();
   for(const item of queue){const li=document.createElement('li'),label=document.createElement('span');label.textContent=`${item.number} → ${item.newLocation}${item.conflict?' · '+item.conflict+' — check Sheet, remove and rescan':''}`;li.append(label);if(item.conflict){const b=document.createElement('button');b.textContent='Remove local entry';b.disabled=syncing;b.onclick=async()=>{if(!confirm(`Remove pending ${item.number}? This will not change the Sheet. Rescan after checking its current data.`))return;try{await store.remove(item);await refresh();await render();}catch{lastMessage='Local storage failed. Entry retained.';}};li.append(b);}$('pending-list').append(li);}
+  await window.rentalChecklist?.render();
  }
  async function refresh(){
   if(loadingList)return loadingList;
   loadingList=(async()=>{lastMessage='Loading checklist…';await render();const data=await api({action:'snapshot'});if(data.status!=='ready'||data.version!==1||!Array.isArray(data.rows))throw Error('sheet_unavailable');await store.setSnapshot(data);lastMessage='List refreshed';return data;})();
   try{return await loadingList;}finally{loadingList=null;await render();}
  }
- async function lookup(number){let s=await store.snapshot();if(!s)s=await refresh();const matches=s.rows.filter(x=>x.number===number);if(matches.length!==1)return {status:matches.length?'duplicate':'not_found',number};if(!matches[0].valid)return {status:'invalid_checkbox',number};const queued=(await store.queue()).find(x=>x.number===number);if(queued)return {status:'pending',number};return {...matches[0],status:'matched'};}
- async function save(match,newLocation){
-  await store.add({id:crypto.randomUUID(),number:match.number,expected:{row:match.row,card:match.card,location:match.location,checked:match.checked,highlighted:match.highlighted,newLocation:match.newLocation},newLocation,createdAt:Date.now()});
+ const reload=()=>refresh().catch(async e=>{lastMessage=e.message==='rate_limited'?'Sheet busy. Local list kept; retry shortly.':'Could not load Sheet. Existing local list kept.';await render();});
+ async function lookup(number){let s=await store.snapshot();if(!s)s=await refresh();const session=await store.session();if(!session)throw Error('no_session');const matches=s.rows.filter(x=>x.number===number);if(matches.length!==1)return {status:matches.length?'duplicate':'not_found',number};if(!matches[0].valid)return {status:'invalid_checkbox',number};if(where(matches[0])!==session.location)return {status:'other_location',number,location:where(matches[0])};if((await store.scans()).some(x=>x.session===session.id&&x.number===number))return {status:'scanned',number};const queued=(await store.queue()).find(x=>x.number===number);if(queued)return {status:'pending',number};return {...matches[0],status:'matched'};}
+ // D receives the checked location; scannedBy stays on this device until the backend has a column for it.
+ async function save(match){
+  const session=await store.session();if(!session)throw Error('no_session');
+  const id=crypto.randomUUID(),at=Date.now();
+  await store.record({id,number:match.number,expected:{row:match.row,card:match.card,location:match.location,checked:match.checked,highlighted:match.highlighted,newLocation:match.newLocation},newLocation:session.location,scannedBy:session.name,createdAt:at},{id,number:match.number,location:session.location,by:session.name,at,session:session.id});
   lastMessage='Saved on this device';await render();
   if((await store.queue()).filter(x=>!x.conflict).length>=5)void sync(false);
  }
@@ -40,15 +49,16 @@ window.rentalBatch=(()=>{
   finally{syncing=false;await render();}
  }
  async function exportCSV(){
-  const [s,q]=await Promise.all([store.snapshot(),store.queue()]);const rows=[['Cert','Current Location','Card','New Location','State']];
-  for(const r of s?.rows||[]){const p=q.find(x=>x.number===r.number);rows.push([r.number,r.location,r.card,p?.newLocation??r.newLocation,p?(p.conflict?'Needs review':'Pending sync'):(r.checked?'Checked in downloaded list':'Unchecked in downloaded list')]);}
-  for(const p of q)if(!s?.rows.some(r=>r.number===p.number))rows.push([p.number,p.expected.location,p.expected.card,p.newLocation,'Pending sync']);
+  const [s,q,scans]=await Promise.all([store.snapshot(),store.queue(),store.scans()]);const rows=[['Cert','Current Location','Card','New Location','State','Scanned by','Scanned at']];
+  const last=new Map(scans.map(x=>[x.number,x])),by=n=>{const x=last.get(n);return x?[x.by,new Date(x.at).toLocaleString()]:['',''];};
+  for(const r of s?.rows||[]){const p=q.find(x=>x.number===r.number);rows.push([r.number,r.location,r.card,p?.newLocation??r.newLocation,p?(p.conflict?'Needs review':'Pending sync'):(r.checked?'Checked in downloaded list':'Unchecked in downloaded list'),...by(r.number)]);}
+  for(const p of q)if(!s?.rows.some(r=>r.number===p.number))rows.push([p.number,p.expected.location,p.expected.card,p.newLocation,'Pending sync',...by(p.number)]);
   const cell=v=>'"'+String(v??'').replace(/^[=+@\-\t\r]/,"'$&").replaceAll('"','""')+'"';
   const url=URL.createObjectURL(new Blob(['\uFEFF'+rows.map(r=>r.map(cell).join(',')).join('\r\n')],{type:'text/csv;charset=utf-8'}));const a=document.createElement('a');a.href=url;a.download='rental-local-'+new Date().toISOString().slice(0,10)+'.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
  }
  async function init(){
   $('sync-now').onclick=()=>void sync(true);
-  $('refresh-list').onclick=()=>void refresh().catch(async e=>{lastMessage=e.message==='rate_limited'?'Sheet busy. Local list kept; retry shortly.':'Could not load Sheet. Existing local list kept.';await render();});
+  $('refresh-list').onclick=()=>void reload();
   $('export-local').onclick=()=>void exportCSV();
   try{await render();await refresh().catch(e=>{lastMessage=e.message==='schema_changed'?'Sheet columns changed. Sync paused; contact your team.':'Could not refresh Sheet; using saved list if available';});await render();if((await store.queue()).some(x=>!x.conflict))void sync(true);}
   catch{ $('sync-status').textContent='Local storage unavailable. Confirm is blocked until storage works.';}
@@ -56,5 +66,5 @@ window.rentalBatch=(()=>{
   addEventListener('beforeunload',e=>{if($('pending-list').children.length){e.preventDefault();e.returnValue='';}});
   document.addEventListener('visibilitychange',()=>{if(!document.hidden)void render();});
  }
- return {init,lookup,save,refresh,sync,render};
+ return {init,lookup,save,refresh,reload,sync,render,locations,where,isText};
 })();

@@ -8,8 +8,12 @@ window.rentalLocal=(()=>{
   snapshot:()=>get('meta','snapshot'),
   setSnapshot:value=>tx(['meta'],'readwrite',t=>t.objectStore('meta').put(value,'snapshot')),
   queue:()=>tx(['queue'],'readonly',(t,done)=>{const r=t.objectStore('queue').getAll();r.onsuccess=()=>done(r.result.sort((a,b)=>a.createdAt-b.createdAt));}),
-  add:item=>tx(['queue'],'readwrite',t=>t.objectStore('queue').add(item)),
-  remove:item=>tx(['queue'],'readwrite',t=>{const s=t.objectStore('queue'),r=s.get(item.number);r.onsuccess=()=>{if(r.result?.id===item.id)s.delete(item.number);};}),
+  session:()=>get('meta','session'),
+  setSession:value=>tx(['meta'],'readwrite',t=>value?t.objectStore('meta').put(value,'session'):t.objectStore('meta').delete('session')),
+  scans:()=>get('meta','scans').then(x=>x||[]),
+  // The pending entry and its scan record commit together; a duplicate pending cert aborts both.
+  record:(item,scan)=>tx(['meta','queue'],'readwrite',t=>{t.objectStore('queue').add(item);const m=t.objectStore('meta'),r=m.get('scans');r.onsuccess=()=>m.put([...(r.result||[]),scan],'scans');}),
+  remove:item=>tx(['meta','queue'],'readwrite',t=>{const s=t.objectStore('queue'),r=s.get(item.number);r.onsuccess=()=>{if(r.result?.id===item.id)s.delete(item.number);};const m=t.objectStore('meta'),x=m.get('scans');x.onsuccess=()=>{if(x.result)m.put(x.result.filter(v=>v.id!==item.id),'scans');};}),
   apply:results=>tx(['meta','queue'],'readwrite',t=>{
    const q=t.objectStore('queue'),m=t.objectStore('meta'),s=m.get('snapshot');
    s.onsuccess=()=>{const data=s.result;if(data){for(const result of results)if(result.match){const i=data.rows.findIndex(x=>x.row===result.match.row);if(i>=0)data.rows[i]=result.match;}m.put(data,'snapshot');}};
