@@ -1,0 +1,1 @@
+{"outputDirectory":"public","rewrites":[{"source":"/api/rental","destination":"https://psa-number-scanner.vercel.app/api/rental"}],"headers":[{"source":"/(.*)","headers":[{"key":"X-Content-Type-Options","value":"nosniff"},{"key":"Referrer-Policy","value":"no-referrer"},{"key":"Cache-Control","value":"no-store"}]}]}

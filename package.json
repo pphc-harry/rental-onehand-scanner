@@ -1,0 +1,8 @@
+{
+  "name": "rental-onehand-scanner-20261028",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "check": "node scripts/check.mjs"
+  }
+}

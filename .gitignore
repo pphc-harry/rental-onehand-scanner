@@ -1,0 +1,13 @@
+# Deployable source is explicitly allowlisted.
+/*
+!/.gitignore
+!/README.md
+!/AGENTS.md
+!/package.json
+!/vercel.json
+!/public/
+!/.github/
+!/scripts/
+**/.DS_Store
+**/node_modules/
+**/.env*
