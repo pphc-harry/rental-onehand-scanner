@@ -53,7 +53,7 @@ window.rentalChecklist=(()=>{
    await rentalBatch.reload();
    if(!rentalBatch.locations(await store.snapshot()).some(l=>l.name===location)){$('start-error').textContent='That location is no longer in the Sheet. Choose again.';return;}
    tab='todo';lastPoll=Date.now();await store.setSession({id:crypto.randomUUID(),name,location,startedAt:Date.now(),ticked:(await store.snapshot()).rows.filter(r=>r.checked).map(r=>r.number)});await rentalBatch.render();
-   message(`Checking ${location}. Open the camera to scan.`);
+   message(`Checking ${location}. Opening the camera…`);void openCamera();
   }catch{$('start-error').textContent='Local storage failed. Try again.';}
   finally{$('begin').disabled=false;}
  }
