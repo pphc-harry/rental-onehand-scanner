@@ -34,11 +34,10 @@ window.rentalChecklist=(()=>{
   document.body.classList.toggle('in-session',active);$('start-screen').hidden=active;$('checklist').hidden=!active;
   if(!greeted){greeted=true;message(active?`Checking ${d.session.location}. Open the camera to scan.`:'Enter your name and choose a location to begin.');}
   if(!active)return renderStart(d.snapshot);
-  const earlier=d.todo.filter(r=>r.checked).length;
-  $('cl-title').textContent=d.session.location;$('cl-who').textContent=`${d.session.name} · since ${time(d.session.startedAt)}${d.snapshot?` · list ${time(d.snapshot.loadedAt)}`:''}`;
+  $('cl-title').textContent=d.session.location;$('cl-who').textContent=`${d.session.name} · since ${time(d.session.startedAt)}`;
   const scanned=d.done.length+d.team.length;
-  $('cl-progress').textContent=`${scanned} / ${d.cards.length} scanned${d.team.length?` (${d.team.length} on other phones)`:''}${earlier?` · ${earlier} of the rest already ticked in the Sheet`:''}`;
-  $('cl-bar').max=Math.max(1,d.cards.length);$('cl-bar').value=scanned;
+  $('cl-progress').textContent=`${scanned} / ${d.cards.length} scanned`;$('cl-team').textContent=d.team.length?`· ${d.team.length} on other phones`:'';
+  $('cl-bar').max=Math.max(1,d.cards.length);$('cl-bar').value=scanned;$('finish-location').classList.toggle('ready',!!d.cards.length&&!d.todo.length);
   $('tab-todo').textContent=`To scan ${d.todo.length}`;$('tab-done').textContent=`Scanned ${scanned}`;
   for(const [id,name] of [['tab-todo','todo'],['tab-done','done']])$(id).setAttribute('aria-pressed',String(tab===name));
   const rows=tab==='todo'?d.todo.map(r=>item(r,d.queued.has(r.number)?'Waiting to sync':r.checked?'✓ in Sheet':'')):d.done.sort((a,b)=>d.mine.get(b.number).at-d.mine.get(a.number).at).map(r=>{const q=d.queued.get(r.number);return item(r,`${time(d.mine.get(r.number).at)} · ${q?(q.conflict?'Needs review':'Waiting to sync'):'Synced'}`);}).concat(d.team.map(r=>item(r,'Other phone')));

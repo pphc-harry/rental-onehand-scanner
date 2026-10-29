@@ -1,6 +1,6 @@
 'use strict';
 window.rentalBatch=(()=>{
- let syncing=false,loadingList=null,lastMessage='',retryTimer=null,idleTimer=null;
+ let syncing=false,failed=false,loadingList=null,lastMessage='',retryTimer=null,idleTimer=null;
  const store=window.rentalLocal;
  const isText=value=>value.trim().length>0&&value.length<=60&&!/[\u0000-\u001f\u007f]/.test(value);
  // A card belongs to its New Location (D) once one is set, otherwise to its Location (B).
@@ -13,6 +13,8 @@ window.rentalBatch=(()=>{
   const conflicts=queue.filter(x=>x.conflict).length;
   $('sync-status').textContent=`${queue.length} pending${conflicts?` · ${conflicts} need review`:''}${syncing?' · Syncing…':lastMessage?' · '+lastMessage:''}`;
   $('list-status').textContent=snapshot?`Local list: ${snapshot.rows.length} rows · ${new Date(snapshot.loadedAt).toLocaleString()}`:'No local list yet. Connect to load the checklist.';
+  // The chip is the only sync status on the scan screen; it opens the Sync & settings sheet.
+  const chip=$('sync-chip');chip.textContent=syncing?'Syncing…':conflicts?`${conflicts} need${conflicts===1?'s':''} review`:failed&&queue.length?`${queue.length} not synced`:queue.length?`${queue.length} to sync`:'✓ Synced';chip.dataset.state=conflicts||failed&&queue.length?'warn':syncing||queue.length?'busy':'ok';
   $('sync-now').disabled=syncing||!queue.length;$('refresh-list').disabled=syncing||!!loadingList;
   $('pending-list').replaceChildren();
   for(const item of queue){const li=document.createElement('li'),label=document.createElement('span');label.textContent=`${item.number} → ${item.newLocation}${item.conflict?' · '+item.conflict+' — check Sheet, remove and rescan':''}`;li.append(label);if(item.conflict){const b=document.createElement('button');b.textContent='Remove local entry';b.disabled=syncing;b.onclick=async()=>{if(!confirm(`Remove pending ${item.number}? This will not change the Sheet. Rescan after checking its current data.`))return;try{await store.remove(item);await refresh();await render();}catch{lastMessage='Local storage failed. Entry retained.';}};li.append(b);}$('pending-list').append(li);}
@@ -38,7 +40,7 @@ window.rentalBatch=(()=>{
  async function sync(manual=true){
   if(syncing)return;
   if(!navigator.locks){lastMessage='Browser update needed for safe sync. Pending entries kept.';await render();return;}
-  syncing=true;clearTimeout(retryTimer);clearTimeout(idleTimer);lastMessage='';await render();
+  syncing=true;failed=false;clearTimeout(retryTimer);clearTimeout(idleTimer);lastMessage='';await render();
   try{await navigator.locks.request('rental-batch-sync',{ifAvailable:true},async lock=>{
    if(!lock){lastMessage='Another tab is syncing';return;}
    do{
@@ -49,7 +51,7 @@ window.rentalBatch=(()=>{
     if(response.status!=='synced'||!Array.isArray(response.results)||response.results.length!==items.length||!items.every(x=>response.results.filter(r=>r.id===x.id&&r.number===x.number).length===1))throw Error('sheet_unavailable');
     await store.apply(response.results);lastMessage=`${response.results.filter(x=>['checked','already_checked'].includes(x.status)).length} synced to Sheet`;await render();
    }while(true);
-  });}catch(e){lastMessage=e.message==='schema_changed'?'Sheet columns changed. Sync paused; pending entries kept.':e.message==='rate_limited'?'Sheet busy — retrying in 60s. Pending entries kept.':'Sync not verified. Pending entries kept; tap Sync now.';if(e.message==='rate_limited')retryTimer=setTimeout(()=>void sync(true),60000);}
+  });}catch(e){failed=true;lastMessage=e.message==='schema_changed'?'Sheet columns changed. Sync paused; pending entries kept.':e.message==='rate_limited'?'Sheet busy — retrying in 60s. Pending entries kept.':'Sync not verified. Pending entries kept; tap Sync now.';if(e.message==='rate_limited')retryTimer=setTimeout(()=>void sync(true),60000);}
   finally{syncing=false;await render();}
  }
  async function exportCSV(){
@@ -64,6 +66,10 @@ window.rentalBatch=(()=>{
   $('sync-now').onclick=()=>void sync(true);
   $('refresh-list').onclick=()=>void reload();
   $('export-local').onclick=()=>void exportCSV();
+  const tools=$('tools');
+  $('sync-chip').onclick=()=>{if($('pending-list').querySelector('button'))$('pending').open=true;tools.hidden=false;tools.showModal();};$('tools-close').onclick=()=>tools.close();
+  tools.addEventListener('click',e=>{const r=tools.getBoundingClientRect();if(e.target===tools&&(e.clientY<r.top||e.clientY>r.bottom||e.clientX<r.left||e.clientX>r.right))tools.close();});
+  tools.addEventListener('close',()=>{tools.hidden=true;$('sync-chip').focus({preventScroll:true});});
   try{await render();await refresh().catch(e=>{lastMessage=e.message==='schema_changed'?'Sheet columns changed. Sync paused; contact your team.':'Could not refresh Sheet; using saved list if available';});await render();if((await store.queue()).some(x=>!x.conflict))void sync(true);}
   catch{ $('sync-status').textContent='Local storage unavailable. Confirm is blocked until storage works.';}
   addEventListener('online',()=>void sync(true));
