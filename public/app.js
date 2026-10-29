@@ -1,6 +1,6 @@
 'use strict';
 const $=id=>document.getElementById(id);
-let worker=null,loading=null,busy=false,pending=null,stream=null,generation=0;
+let worker=null,loading=null,busy=false,pending=null,stream=null,generation=0,stillMisses=0;
 async function api(body){const r=await fetch('/api/rental',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),signal:AbortSignal.timeout(65000)});const d=await r.json();if(!r.ok)throw Error(d.status||'sheet_unavailable');return d;}
 // Result tones: ok = the card is counted or can be counted, bad = nothing was marked, empty = in progress.
 const notMarked=' Nothing was marked.',unread={ambiguous:'More than one label or cert number is in the photo. Frame one label and retake.',uncertain:'The digits were not clear enough to trust. Hold steady, avoid glare and retake.',cut:'The cert number runs off the edge of the photo, so digits may be missing. Fit the whole label inside the box and retake.'};
@@ -25,7 +25,9 @@ $('discard').onclick=()=>{if(!$('discard').disabled)retake();};
 $('review').addEventListener('cancel',e=>{e.preventDefault();retake();});
 $('review').addEventListener('keydown',e=>{if(e.key!=='Tab')return;const b=[...$('review').querySelectorAll('button:not([hidden]):not(:disabled),input:not(:disabled)')];if(!b.length){e.preventDefault();return;}if(e.shiftKey&&(document.activeElement===b[0]||!b.includes(document.activeElement))){e.preventDefault();b.at(-1).focus();}else if(!e.shiftKey&&document.activeElement===b.at(-1)){e.preventDefault();b[0].focus();}});
 function stopCamera(){generation++;stream?.getTracks().forEach(t=>t.stop());stream=null;$('video').srcObject=null;$('camera').hidden=true;controls();}
-async function openCamera(){if(busy||pending)return;const g=++generation;busy=true;controls();try{const s=await deadline(navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:{ideal:'environment'},width:{ideal:1920},height:{ideal:1080}}}).then(s=>{if(g!==generation){s.getTracks().forEach(t=>t.stop());return null;}return s;}),25000,()=>generation++);if(!s)return;stream=s;$('video').srcObject=s;$('camera').hidden=false;await deadline($('video').play(),12000);message('Fit the whole label inside the box, then tap Capture.');}catch{stopCamera();message('Camera unavailable. Allow camera access for this site, or use Photo.','bad');}finally{busy=false;controls();}}
+async function openCamera(){if(busy||pending)return;const g=++generation;busy=true;controls();try{const s=await deadline(navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:{ideal:'environment'},width:{ideal:1920},height:{ideal:1080}}}).then(s=>{if(g!==generation){s.getTracks().forEach(t=>t.stop());return null;}return s;}),25000,()=>generation++);if(!s)return;stream=s;stillMisses=0;focusCentre(s.getVideoTracks()[0]);$('video').srcObject=s;$('camera').hidden=false;await deadline($('video').play(),12000);message('Fit the whole label inside the box, then tap Capture.');}catch{stopCamera();message('Camera unavailable. Allow camera access for this site, or use Photo.','bad');}finally{busy=false;controls();}}
+// Continuous autofocus on the middle of the view, where the label box is. Chrome on Android supports it; other browsers ignore it.
+function focusCentre(track){if(!track?.getCapabilities?.().focusMode?.includes('continuous'))return;track.applyConstraints({advanced:[{focusMode:'continuous'}]}).then(()=>navigator.mediaDevices.getSupportedConstraints().pointsOfInterest&&track.applyConstraints({advanced:[{pointsOfInterest:[{x:.5,y:.5}]}]})).catch(()=>{});}
 // Match the centered object-fit:cover viewport, rather than capturing hidden sensor edges.
 function captureVisibleFrame(video){
  const box=video.getBoundingClientRect(),vw=video.videoWidth,vh=video.videoHeight;
@@ -35,7 +37,34 @@ function captureVisibleFrame(video){
  c.getContext('2d').drawImage(video,(vw-sw)/2,(vh-sh)/2,sw,sh,0,0,c.width,c.height);
  return c;
 }
-$('capture').onclick=$('shutter').onclick=()=>{if(!stream||busy||pending)return;const c=captureVisibleFrame($('video'));if(c)void scan(c);};
+// Chrome on Android can take a full-resolution still: more pixels, and usually sharper than a video frame. A still can show
+// more than the view (wider field, no stabilisation crop), so only the part matching the view is used; failing that, the video frame.
+// Returns that part, or why the video frame is used instead.
+async function stillPhoto(track,frame){
+ try{const ic=new ImageCapture(track),caps=await deadline(ic.getPhotoCapabilities(),2000).catch(()=>({})),blob=await deadline(ic.takePhoto(caps.fillLightMode?.includes('off')?{fillLightMode:'off'}:{}),5000),photo=await createImageBitmap(blob);try{return findView(photo,frame);}finally{photo.close();}}catch{return 'failed or timed out';}
+}
+// The still shares the view's centre, give or take hand movement, at an unknown scale. Small grey copies are compared at each
+// scale and shift, coarse first, then finely around the 3 best; the match is used only if the correlation is at least .9.
+function findView(photo,frame){
+ const most=Math.min(photo.width/frame.width,photo.height/frame.height);if(most<1.2)return 'no larger than the video';
+ const grey=(src,w,h)=>{const c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d',{willReadFrequently:true});x.imageSmoothingQuality='high';x.drawImage(src,0,0,w,h);const d=x.getImageData(0,0,w,h).data,g=new Float32Array(w*h);for(let i=0;i<g.length;i++)g[i]=d[i*4]*.299+d[i*4+1]*.587+d[i*4+2]*.114;return g;};
+ const level=size=>{const T=Math.max(12,Math.round(size*Math.sqrt(frame.width/frame.height))),th=Math.max(12,Math.round(T*frame.height/frame.width)),pw=Math.round(photo.width*1.5*T/(frame.width*most)),ph=Math.round(photo.height*1.5*T/(frame.width*most));return {T,th,pw,ph,fx:pw/photo.width,fy:ph/photo.height,view:grey(frame,T,th),small:grey(photo,pw,ph)};};
+ // Correlation of the view with the still's region at k still pixels per frame pixel, shifted by (sx, sy) of the region's size.
+ const score=(L,k,sx,sy)=>{const rw=frame.width*k*L.fx,rh=frame.height*k*L.fy,x0=(L.pw-rw)/2+sx*rw,y0=(L.ph-rh)/2+sy*rh,{T,th,pw,ph,small,view}=L,n=T*th;if(x0<-1||y0<-1||x0+rw>pw+1||y0+rh>ph+1)return -1;
+  let a=0,b=0,aa=0,bb=0,ab=0;for(let j=0;j<th;j++){const y=Math.min(ph-1.001,Math.max(0,y0+(j+.5)*rh/th-.5)),yi=y|0,fy=y-yi;for(let q=0;q<T;q++){const xx=Math.min(pw-1.001,Math.max(0,x0+(q+.5)*rw/T-.5)),xi=xx|0,fx=xx-xi,p=yi*pw+xi,v=(small[p]*(1-fx)+small[p+1]*fx)*(1-fy)+(small[p+pw]*(1-fx)+small[p+pw+1]*fx)*fy,u=view[j*T+q];a+=u;b+=v;aa+=u*u;bb+=v*v;ab+=u*v;}}
+  return (ab-a*b/n)/Math.sqrt(Math.max(1e-9,(aa-a*a/n)*(bb-b*b/n)));};
+ const coarse=level(16),fine=level(48),top=[];let best={r:-1};
+ for(let i=0;i<=52;i++)for(let sx=-4;sx<=4;sx++)for(let sy=-4;sy<=4;sy++){const k=most*2**(-i/40);top.push({r:score(coarse,k,sx*.015,sy*.015),k,sx:sx*.015,sy:sy*.015});}
+ for(const c of top.sort((a,b)=>b.r-a.r).slice(0,3))for(let i=-4;i<=4;i++)for(let sx=-3;sx<=3;sx++)for(let sy=-3;sy<=3;sy++){const k=c.k*2**(i/160),x=c.sx+sx*.005,y=c.sy+sy*.005,r=score(fine,k,x,y);if(r>best.r)best={r,k,sx:x,sy:y};}
+ if(best.r<.9)return 'did not match the view';if(best.k<1.2)return 'no larger than the video';
+ const rw=frame.width*best.k,rh=frame.height*best.k,c=document.createElement('canvas');c.width=Math.round(rw);c.height=Math.round(rh);c.getContext('2d').drawImage(photo,(photo.width-rw)/2+best.sx*rw,(photo.height-rh)/2+best.sy*rh,rw,rh,0,0,c.width,c.height);return c;
+}
+// After 3 captures in a row without a usable still, stop asking for one until the camera is reopened.
+$('capture').onclick=$('shutter').onclick=async()=>{if(!stream||busy||pending)return;const g=generation,frame=captureVisibleFrame($('video'));if(!frame)return;busy=true;controls();
+ const still=!window.ImageCapture?'not supported by this browser':stillMisses>=3?'stopped after 3 misses; reopen the camera to retry':(message('Taking the photo…'),await stillPhoto(stream.getVideoTracks()[0],frame));
+ stillMisses=typeof still==='string'?stillMisses+1:0;busy=false;if(g!==generation){controls();message('Camera stopped.'+notMarked);return;}
+ const image=typeof still==='string'?frame:still;$('photo-status').hidden=false;$('photo-status').textContent=image===frame?`Last capture: video frame ${frame.width}×${frame.height}. Full-resolution photo ${still}.`:`Last capture: full-resolution photo ${image.width}×${image.height} (video frame ${frame.width}×${frame.height}).`;
+ void scan(image);};
 $('start').onclick=openCamera;$('camera-off').onclick=()=>$('start').click();$('stop').onclick=stopCamera;$('choose').onclick=()=>$('file').click();
 // scan() owns busy once it starts, so a stopped read is not unlocked again when it finally ends.
 $('file').onchange=async e=>{const f=e.target.files[0];e.target.value='';if(!f||busy||pending)return;busy=true;controls();const url=URL.createObjectURL(f),image=new Image();image.src=url;try{await deadline(image.decode(),15000);}catch{URL.revokeObjectURL(url);busy=false;controls();message('Could not open that photo. Use a JPEG or PNG.','bad');return;}busy=false;try{await scan(image);}catch{pending=null;busy=false;controls();message('Could not open that photo. Use a JPEG or PNG.','bad');}finally{URL.revokeObjectURL(url);}};
