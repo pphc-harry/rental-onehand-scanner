@@ -67,7 +67,7 @@ window.rentalChecklist=(()=>{
   $('finish-status').textContent=waitingText(d);$('finish-anyway').hidden=true;$('finish-sync').textContent=d.waiting.length?'Sync & finish':'Finish';
   $('finish').hidden=false;$('finish').showModal();
  }
- async function end(){await store.setSession(null);tab='todo';$('finish').close();stopCamera();await rentalBatch.render();message('Location finished. Choose the next location.');}
+ async function end(){const done=(await store.session())?.location;await store.setSession(null);tab='todo';$('finish').close();stopCamera();await rentalBatch.render();message(`${done||'Location'} finished. Choose the next location.`,'ok');}
  async function syncAndFinish(){
   if(finishing)return;finishing=true;finishControls();$('finish-status').textContent='Syncing…';
   try{
