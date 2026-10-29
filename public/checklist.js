@@ -10,7 +10,7 @@ window.rentalChecklist=(()=>{
  }
  let tab='todo',finishing=false,greeted=false,active=false,lastPoll=0,shownLocations='',counts=new Map();
  // While a session is open the list reloads so cards other phones synced show as scanned.
- const pollEvery=60000;
+ const pollEvery=10000;
  const time=at=>new Date(at).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
  async function data(){
   const [s,session,scans,queue]=await Promise.all([store.snapshot(),store.session(),store.scans(),store.queue()]);

@@ -2,6 +2,9 @@
 window.rentalBatch=(()=>{
  let syncing=false,failed=false,loadingList=null,lastMessage='',retryTimer=null,idleTimer=null;
  const store=window.rentalLocal;
+ const idleDelay=10000;
+ let lastSavedAt=0;
+ function scheduleIdle(){clearTimeout(idleTimer);idleTimer=setTimeout(()=>void sync(true),Math.max(0,lastSavedAt+idleDelay-Date.now()));}
  const isText=value=>value.trim().length>0&&value.length<=60&&!/[\u0000-\u001f\u007f]/.test(value);
  // A card belongs to its New Location (D) once one is set, otherwise to its Location (B).
  const where=row=>String(row.newLocation??'').trim()||String(row.location??'').trim();
@@ -33,14 +36,15 @@ window.rentalBatch=(()=>{
   const session=await store.session();if(!session)throw Error('no_session');
   const id=crypto.randomUUID(),at=Date.now();
   await store.record({id,number:match.number,expected:{row:match.row,card:match.card,location:match.location,checked:match.checked,highlighted:match.highlighted,newLocation:match.newLocation},newLocation:session.location,scannedBy:session.name,createdAt:at},{id,number:match.number,location:session.location,by:session.name,at,session:session.id});
-  lastMessage='Saved on this device';await render();
-  clearTimeout(idleTimer);
-  if((await store.queue()).filter(x=>!x.conflict).length>=5)void sync(false);else idleTimer=setTimeout(()=>void sync(true),30000);
+  lastSavedAt=Date.now();lastMessage='Saved on this device';await render();
+  scheduleIdle();
+  if((await store.queue()).filter(x=>!x.conflict).length>=5)void sync(false);
  }
  async function sync(manual=true){
   if(syncing)return;
   if(!navigator.locks){lastMessage='Browser update needed for safe sync. Pending entries kept.';await render();return;}
   syncing=true;failed=false;clearTimeout(retryTimer);clearTimeout(idleTimer);lastMessage='';await render();
+  let completed=false;
   try{await navigator.locks.request('rental-batch-sync',{ifAvailable:true},async lock=>{
    if(!lock){lastMessage='Another tab is syncing';return;}
    do{
@@ -51,8 +55,9 @@ window.rentalBatch=(()=>{
     if(response.status!=='synced'||!Array.isArray(response.results)||response.results.length!==items.length||!items.every(x=>response.results.filter(r=>r.id===x.id&&r.number===x.number).length===1))throw Error('sheet_unavailable');
     await store.apply(response.results);lastMessage=`${response.results.filter(x=>['checked','already_checked'].includes(x.status)).length} synced to Sheet`;await render();
    }while(true);
-  });}catch(e){failed=true;lastMessage=e.message==='schema_changed'?'Sheet columns changed. Sync paused; pending entries kept.':e.message==='rate_limited'?'Sheet busy — retrying in 60s. Pending entries kept.':'Sync not verified. Pending entries kept; tap Sync now.';if(e.message==='rate_limited')retryTimer=setTimeout(()=>void sync(true),60000);}
-  finally{syncing=false;await render();}
+   completed=true;
+  });}catch(e){failed=true;clearTimeout(idleTimer);lastMessage=e.message==='schema_changed'?'Sheet columns changed. Sync paused; pending entries kept.':e.message==='rate_limited'?'Sheet busy — retrying in 60s. Pending entries kept.':'Sync not verified. Pending entries kept; tap Sync now.';if(e.message==='rate_limited')retryTimer=setTimeout(()=>void sync(true),60000);}
+  finally{syncing=false;if(completed&&(await store.queue()).some(x=>!x.conflict))scheduleIdle();await render();}
  }
  async function exportCSV(){
   const [s,q,scans]=await Promise.all([store.snapshot(),store.queue(),store.scans()]);const rows=[['Cert','Current Location','Card','New Location','State','Scanned by','Scanned at']];
