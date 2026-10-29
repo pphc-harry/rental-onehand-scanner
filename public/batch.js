@@ -5,6 +5,8 @@ window.rentalBatch=(()=>{
  const isText=value=>value.trim().length>0&&value.length<=60&&!/[\u0000-\u001f\u007f]/.test(value);
  // A card belongs to its New Location (D) once one is set, otherwise to its Location (B).
  const where=row=>String(row.newLocation??'').trim()||String(row.location??'').trim();
+ // Cards ticked in C after the session started were scanned on another phone (or another app). Sessions without a baseline count none.
+ const scannedElsewhere=session=>{const base=session.ticked&&new Set(session.ticked);return row=>!!base&&!!row.checked&&!base.has(row.number);};
  function locations(snapshot){const counts=new Map();for(const r of snapshot?.rows||[]){const l=where(r);if(isText(l))counts.set(l,(counts.get(l)||0)+1);}return [...counts].map(([name,count])=>({name,count})).sort((a,b)=>a.name.localeCompare(b.name,undefined,{numeric:true}));}
  async function render(){
   const [snapshot,queue]=await Promise.all([store.snapshot(),store.queue()]);
@@ -16,13 +18,14 @@ window.rentalBatch=(()=>{
   for(const item of queue){const li=document.createElement('li'),label=document.createElement('span');label.textContent=`${item.number} → ${item.newLocation}${item.conflict?' · '+item.conflict+' — check Sheet, remove and rescan':''}`;li.append(label);if(item.conflict){const b=document.createElement('button');b.textContent='Remove local entry';b.disabled=syncing;b.onclick=async()=>{if(!confirm(`Remove pending ${item.number}? This will not change the Sheet. Rescan after checking its current data.`))return;try{await store.remove(item);await refresh();await render();}catch{lastMessage='Local storage failed. Entry retained.';}};li.append(b);}$('pending-list').append(li);}
   await window.rentalChecklist?.render();
  }
- async function refresh(){
+ async function refresh(quiet=false){
   if(loadingList)return loadingList;
-  loadingList=(async()=>{lastMessage='Loading checklist…';await render();const data=await api({action:'snapshot'});if(data.status!=='ready'||data.version!==1||!Array.isArray(data.rows))throw Error('sheet_unavailable');await store.setSnapshot(data);lastMessage='List refreshed';return data;})();
+  loadingList=(async()=>{if(!quiet){lastMessage='Loading checklist…';await render();}const data=await api({action:'snapshot'});if(data.status!=='ready'||data.version!==1||!Array.isArray(data.rows))throw Error('sheet_unavailable');await store.setSnapshot(data);if(!quiet)lastMessage='List refreshed';return data;})();
   try{return await loadingList;}finally{loadingList=null;await render();}
  }
- const reload=()=>refresh().catch(async e=>{lastMessage=e.message==='rate_limited'?'Sheet busy. Local list kept; retry shortly.':'Could not load Sheet. Existing local list kept.';await render();});
- async function lookup(number){let s=await store.snapshot();if(!s)s=await refresh();const session=await store.session();if(!session)throw Error('no_session');const matches=s.rows.filter(x=>x.number===number);if(matches.length!==1)return {status:matches.length?'duplicate':'not_found',number};if(!matches[0].valid)return {status:'invalid_checkbox',number};if(where(matches[0])!==session.location)return {status:'other_location',number,location:where(matches[0])};if((await store.scans()).some(x=>x.session===session.id&&x.number===number))return {status:'scanned',number};const queued=(await store.queue()).find(x=>x.number===number);if(queued)return {status:'pending',number};return {...matches[0],status:'matched'};}
+ const reload=(quiet=false)=>refresh(quiet).catch(async e=>{lastMessage=e.message==='rate_limited'?'Sheet busy. Local list kept; retry shortly.':'Could not load Sheet. Existing local list kept.';await render();});
+ const poll=()=>syncing?null:reload(true);
+ async function lookup(number){let s=await store.snapshot();if(!s)s=await refresh();const session=await store.session();if(!session)throw Error('no_session');const matches=s.rows.filter(x=>x.number===number);if(matches.length!==1)return {status:matches.length?'duplicate':'not_found',number};if(!matches[0].valid)return {status:'invalid_checkbox',number};if(where(matches[0])!==session.location)return {status:'other_location',number,location:where(matches[0])};if((await store.scans()).some(x=>x.session===session.id&&x.number===number))return {status:'scanned',number};const queued=(await store.queue()).find(x=>x.number===number);if(queued)return {status:'pending',number};if(scannedElsewhere(session)(matches[0]))return {status:'team_scanned',number};return {...matches[0],status:'matched'};}
  // D receives the checked location; scannedBy stays on this device until the backend has a column for it.
  async function save(match){
   const session=await store.session();if(!session)throw Error('no_session');
@@ -67,5 +70,5 @@ window.rentalBatch=(()=>{
   addEventListener('beforeunload',e=>{if($('pending-list').children.length){e.preventDefault();e.returnValue='';}});
   document.addEventListener('visibilitychange',()=>{if(!document.hidden)void render();});
  }
- return {init,lookup,save,refresh,reload,sync,render,locations,where,isText};
+ return {init,lookup,save,refresh,reload,poll,sync,render,locations,where,isText,scannedElsewhere};
 })();
