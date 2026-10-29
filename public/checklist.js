@@ -34,7 +34,7 @@ window.rentalChecklist=(()=>{
   document.body.classList.toggle('in-session',active);$('start-screen').hidden=active;$('checklist').hidden=!active;
   if(!greeted){greeted=true;message(active?`Checking ${d.session.location}. Open the camera to scan.`:'Enter your name and choose a location to begin.');}
   if(!active)return renderStart(d.snapshot);
-  $('cl-title').textContent=d.session.location;$('cl-who').textContent=`${d.session.name} · since ${time(d.session.startedAt)}`;
+  $('cl-title').textContent=d.session.location;$('cl-who').textContent=`${d.session.name} · ${d.done.length} scanned · since ${time(d.session.startedAt)}`;
   const scanned=d.done.length+d.team.length;
   $('cl-progress').textContent=`${scanned} / ${d.cards.length} scanned`;$('cl-team').textContent=d.team.length?`· ${d.team.length} on other phones`:'';
   $('cl-bar').max=Math.max(1,d.cards.length);$('cl-bar').value=scanned;$('finish-location').classList.toggle('ready',!!d.cards.length&&!d.todo.length);
