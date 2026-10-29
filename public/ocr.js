@@ -129,6 +129,13 @@ async function recoverEmpty(w,image,out,seen){
  }
  return out;
 }
+// PSA labels also carry the cert number as a Code 128 barcode; its check character makes a read exact or nothing.
+// Chrome on Android has a built-in reader. Other browsers (Safari on iPhone) load the zxing-wasm one from jsdelivr once, about 1 MB.
+let barcodes=null;
+function barcodeReader(){return barcodes??=(async()=>{const formats=['code_128'];if(window.BarcodeDetector&&(await BarcodeDetector.getSupportedFormats()).includes('code_128'))return new BarcodeDetector({formats});await new Promise((done,fail)=>{const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/barcode-detector@3.2.3/dist/iife/ponyfill.js';s.onload=done;s.onerror=fail;document.head.append(s);});await BarcodeDetectionAPI.prepareZXingModule({fireImmediately:true});return new BarcodeDetectionAPI.BarcodeDetector({formats});})().catch(e=>{barcodes=null;throw e;});}
+// One cert number among the barcodes is a read; two different ones mean two labels in the photo. No barcode returns null.
+// A reader still loading after 4 s is skipped for this photo (the printed number is read) and keeps loading for the next.
+async function readBarcode(image){const found=await deadline((await deadline(barcodeReader(),4000)).detect(image),5000),numbers=[...new Set(found.map(b=>b.rawValue.trim()).filter(v=>/^\d{6,12}$/.test(v)))];return numbers.length?{number:numbers.length===1?numbers[0]:'',reason:numbers.length===1?'found':'ambiguous',path:'barcode',observed:numbers}:null;}
 function recordOCR(result){
  // Keep only the latest bounded diagnostic locally; no photo or cert is stored.
  try{localStorage.setItem('rental-last-ocr',JSON.stringify({at:new Date().toISOString(),reason:result.reason,path:result.path||'standard',candidateCount:result.candidates?.length||0,conflict:(result.observed?.length||0)>1}));}catch{}

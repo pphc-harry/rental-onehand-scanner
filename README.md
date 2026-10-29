@@ -22,7 +22,7 @@ PRs and pushes run syntax/config/local asset checks in GitHub Actions. These che
 
 ## Local preview
 
-Run `python3 -m http.server 8080 --directory public` and open http://localhost:8080 for UI work. This static server does not proxy `/api/rental`; matching/sync require a Vercel deployment or equivalent rewrite. OCR downloads Tesseract from its existing CDN. Camera access requires localhost or HTTPS.
+Run `python3 -m http.server 8080 --directory public` and open http://localhost:8080 for UI work. This static server does not proxy `/api/rental`; matching/sync require a Vercel deployment or equivalent rewrite. OCR downloads Tesseract from its existing CDN. For PSA, the label barcode is read first with the browser's built-in BarcodeDetector, or with barcode-detector (zxing-wasm) from the same CDN where the browser has none; the printed number is read only when no barcode is found. Camera access requires localhost or HTTPS.
 
 ## Deployment and backend boundary
 

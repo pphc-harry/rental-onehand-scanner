@@ -61,3 +61,4 @@ dialog.sheet{width:100%;max-width:520px;max-height:calc(100dvh - 24px);margin:au
 #status[data-tone="ok"],#review-status[data-tone="ok"]{color:var(--ok);font-weight:600}#status[data-tone="bad"],#review-status[data-tone="bad"],#review #number[data-tone="bad"]{color:var(--bad)}#status[data-tone="bad"]{font-weight:600}
 #review #review-status:is([data-tone="ok"],[data-tone="bad"]){font-size:14px!important;line-height:1.4;font-weight:600;padding:10px 12px;border:1px solid currentColor;border-radius:10px;background:color-mix(in srgb,currentColor 12%,transparent)}
 #review #number[data-tone="bad"]{font-family:inherit;font-size:clamp(26px,8vw,36px);font-weight:700}
+#review #read-source{text-align:center;margin:0 0 8px}#read-source:empty{display:none}
