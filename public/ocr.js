@@ -9,31 +9,36 @@ function region(c,b){const h=b.y1-b.y0,pad=Math.max(8,h*.45),left=Math.max(0,b.x
 function labelRegions(source){
  const scale=Math.min(1,900/Math.max(source.width,source.height)),w=Math.round(source.width*scale),h=Math.round(source.height*scale);
  const small=document.createElement('canvas');small.width=w;small.height=h;const sx=small.getContext('2d',{willReadFrequently:true});sx.drawImage(source,0,0,w,h);
- const pixels=sx.getImageData(0,0,w,h).data,mask=new Uint8Array(w*h),queue=new Int32Array(w*h),labels=[];
+ const pixels=sx.getImageData(0,0,w,h).data,mask=new Uint8Array(w*h),queue=new Int32Array(w*h),labels=[],tilts=[];
  for(let i=0;i<mask.length;i++){const r=pixels[i*4],g=pixels[i*4+1],b=pixels[i*4+2];mask[i]=r>100&&r>g*1.28&&r>b*1.12?1:0;}
  for(let start=0;start<mask.length;start++){
   if(!mask[start])continue;let head=0,tail=1,minX=w,minY=h,maxX=0,maxY=0;queue[0]=start;mask[start]=0;
   while(head<tail){const p=queue[head++],x=p%w,y=Math.floor(p/w);minX=Math.min(minX,x);maxX=Math.max(maxX,x);minY=Math.min(minY,y);maxY=Math.max(maxY,y);
    for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){const nx=x+dx,ny=y+dy;if(nx<0||ny<0||nx>=w||ny>=h)continue;const n=ny*w+nx;if(mask[n]){mask[n]=0;queue[tail++]=n;}}
   }
-  const bw=maxX-minX,bh=maxY-minY;if(tail<100||bw<75||bw/bh<1.7||bw/bh>7)continue;
+  // A border narrower than a whole label is one cut off at the frame edge: it only measures the tilt.
+  const bw=maxX-minX,bh=maxY-minY,partial=bw/bh<1.7;if(tail<100||bw<75||bw/bh<1.1||bw/bh>7)continue;
   const tops=new Float64Array(bw+1).fill(h),bottoms=new Float64Array(bw+1).fill(-1);
   for(let j=0;j<tail;j++){const p=queue[j],x=p%w-minX,y=Math.floor(p/w);tops[x]=Math.min(tops[x],y);bottoms[x]=Math.max(bottoms[x],y);}
   // The hologram interrupts the lower red border. Columns containing only the
   // upper edge must not be fitted as the bottom edge (which inverted the crop).
   const fit=values=>{let n=0,a=0,b=0,c=0,d=0;for(let x=Math.ceil(bw*.08);x<bw*.92;x++){const y=values[x];if(y<0||y>=h||bottoms[x]-tops[x]<bh*.35)continue;n++;a+=x;b+=y;c+=x*x;d+=x*y;}const m=n>=bw*.15?(n*d-a*b)/(n*c-a*a):NaN;return {m,k:(b-m*a)/n};};
   const top=fit(tops),bottom=fit(bottoms);const slope=(top.m+bottom.m)/2,angle=Math.atan(slope),centerX=(minX+maxX)/2,centerY=(top.k+bottom.k)/2+slope*bw/2;
-  const height=(bottom.k-top.k+(bottom.m-top.m)*bw/2)*Math.cos(angle);if(!Number.isFinite(angle)||height<15||bw/height<2||bw/height>7||Math.abs(top.m-bottom.m)>.3)continue;
+  const height=(bottom.k-top.k+(bottom.m-top.m)*bw/2)*Math.cos(angle);if(!Number.isFinite(angle)||height<15||!partial&&bw/height<2||bw/height>7||Math.abs(top.m-bottom.m)>(partial?.05:.3))continue;
   const crop=document.createElement('canvas');crop.width=1400;crop.height=Math.round(height/bw*1400+160);const ctx=crop.getContext('2d');ctx.fillStyle='white';ctx.fillRect(0,0,crop.width,crop.height);
   ctx.translate(crop.width/2,crop.height/2);const zoom=1400/(bw/scale);ctx.scale(zoom,zoom);ctx.rotate(-angle);ctx.drawImage(source,-centerX/scale,-centerY/scale);
   const sample=ctx.getImageData(140,Math.floor(crop.height*.2),1120,Math.floor(crop.height*.6)).data;let neutral=0;for(let i=0;i<sample.length;i+=4){const r=sample[i],g=sample[i+1],b=sample[i+2];if(Math.min(r,g,b)>135&&Math.max(r,g,b)-Math.min(r,g,b)<65)neutral++;}if(neutral/(sample.length/4)<.4)continue;
+  if(partial){tilts.push({area:bw*height,angle:angle*180/Math.PI});continue;}
   labels.push({canvas:crop,area:bw*height,angle:angle*180/Math.PI});
  }
- return labels.sort((a,b)=>b.area-a.area).slice(0,4);
+ const out=labels.sort((a,b)=>b.area-a.area).slice(0,4);out.tilt=tilts.sort((a,b)=>b.area-a.area)[0]?.angle||0;return out;
 }
-async function readNumber(w,c,seen=new Set()){
+// A number reaching the photo edge may have lost digits outside the frame; it is never accepted.
+function atEdge(c,b,inset=0){const margin=(b.y1-b.y0)*.8;return b.x0-inset<margin||c.width-inset-b.x1<margin;}
+async function readNumber(w,c,seen=new Set(),inset=c.pad||0){
  const data=await recognize(w,c,'11'),hits=findCandidates(data),raw=[data.text];hits.forEach(h=>seen.add(h.number));
  if(hits.length!==1)return {number:'',reason:hits.length?'ambiguous':'empty',candidates:hits,canvas:c,raw:raw.join('\n')};
+ if(atEdge(c,hits[0].bbox,inset))return {number:'',reason:'cut',bbox:hits[0].bbox,candidates:hits,canvas:c,raw:raw.join('\n')};
  const hit=hits[0],confirm=await recognize(w,region(c,hit.bbox),'7','0123456789');raw.push(confirm.text);const exact=confirm.text.trim().replace(/\s/g,'');if(/^\d{6,12}$/.test(exact))seen.add(exact);
  return {number:seen.size===1&&confirm.text.trim()===hit.number&&hit.confidence>=40&&confirm.confidence>=40?hit.number:'',reason:seen.size===1&&confirm.text.trim()===hit.number&&hit.confidence>=40&&confirm.confidence>=40?'found':'uncertain',bbox:hit.bbox,candidates:hits,canvas:c,raw:raw.join('\n---\n')};
 }
@@ -59,13 +64,13 @@ function numberLines(data){
  }return hits;
 }
 async function retryLabel(w,c,first,seen=new Set((first.candidates||[]).map(h=>h.number))){
- if(first.number||first.reason==='ambiguous')return first;
+ if(first.number||first.reason==='ambiguous'||first.reason==='cut')return first;
  const zone=numberZone(c),raw=[first.raw];let agreed=null;
  // Always enter this path when the first pass is empty, even without an OCR bbox.
  for(const [input,mode,whitelist] of [[zone.canvas,'6',''],[contrast(zone.canvas),'6','0123456789']]){
   const data=await recognize(w,input,mode,whitelist);raw.push(data.text);const hits=numberLines(data);
   if(hits.length>1)return {...first,reason:'ambiguous',raw:raw.join('\n---\n'),path:'number-zone'};
-  if(hits.length!==1)continue;const hit=hits[0];seen.add(hit.number);
+  if(hits.length!==1)continue;const hit=hits[0];if(atEdge(zone.canvas,hit.bbox))return {...first,reason:'cut',raw:raw.join('\n---\n'),path:'number-zone'};seen.add(hit.number);
   const check=await recognize(w,region(zone.canvas,hit.bbox),'7');raw.push(check.text);
   const exact=check.text.trim().replace(/\s/g,'');if(/^\d{6,12}$/.test(exact))seen.add(exact);
   if(exact===hit.number&&hit.confidence>=50&&check.confidence>=50)agreed={...hit,bbox:{x0:hit.bbox.x0+zone.box.x0,y0:hit.bbox.y0+zone.box.y0,x1:hit.bbox.x1+zone.box.x0,y1:hit.bbox.y1+zone.box.y0}};
@@ -73,6 +78,10 @@ async function retryLabel(w,c,first,seen=new Set((first.candidates||[]).map(h=>h
  }
  if(seen.size>1)return {...first,number:'',reason:'uncertain',raw:raw.join('\n---\n'),path:'number-zone-conflict'};
  return agreed?{number:agreed.number,reason:'found',bbox:agreed.bbox,candidates:[agreed],canvas:c,raw:raw.join('\n---\n'),path:'number-zone'}:{...first,raw:raw.join('\n---\n'),path:'number-zone-failed'};
+}
+function rotated(c,degrees){
+ const a=-degrees*Math.PI/180,cos=Math.abs(Math.cos(a)),sin=Math.abs(Math.sin(a)),out=document.createElement('canvas');out.width=Math.ceil(c.width*cos+c.height*sin);out.height=Math.ceil(c.width*sin+c.height*cos);
+ const x=out.getContext('2d');x.fillStyle='white';x.fillRect(0,0,out.width,out.height);x.translate(out.width/2,out.height/2);x.rotate(a);x.drawImage(c,-c.width/2,-c.height/2);return out;
 }
 async function detectPass(w,image,seen){
  const full=makeCanvas(image,2400),labels=labelRegions(full),found=[],attempts=[];
@@ -83,20 +92,23 @@ async function detectPass(w,image,seen){
  if(labels.length>1)return {number:'',reason:'ambiguous',canvas:full,candidates:found.flatMap(r=>r.candidates),raw:attempts.map(r=>r.raw).join('\n---\n')};
  // A failed crop may recover from original pixels, but conflicting candidates
  // or multiple labels must never be silently replaced with another number.
- if(attempts.some(a=>a.reason==='ambiguous'||a.path==='number-zone-conflict'))return attempts[0];
- let out=await readNumber(w,makeCanvas(image),seen);if(out.reason==='empty'){const data=await recognize(w,full,'6'),hits=findCandidates(data);hits.forEach(h=>seen.add(h.number));if(hits.length===1){const confirm=await recognize(w,region(full,hits[0].bbox),'7','0123456789');const exact=confirm.text.trim().replace(/\s/g,'');if(/^\d{6,12}$/.test(exact))seen.add(exact);out={number:confirm.text.trim()===hits[0].number&&hits[0].confidence>=40&&confirm.confidence>=40?hits[0].number:'',reason:'uncertain',canvas:full,bbox:hits[0].bbox,candidates:hits,raw:data.text+'\n---\n'+confirm.text};if(out.number)out.reason='found';}else if(hits.length>1)out={number:'',reason:'ambiguous',canvas:full,candidates:hits,raw:data.text};}
+ if(attempts.some(a=>a.reason==='ambiguous'||a.reason==='cut'||a.path==='number-zone-conflict'))return attempts[0];
+ // With no whole label, a tilted cut-off border still straightens the whole-frame read; the tilted original is not read first, so its partial digits cannot conflict.
+ const tilt=!labels.length&&Math.abs(labels.tilt)>=1.5?labels.tilt:0,flat=c=>tilt?rotated(c,tilt):c,whole=flat(full);
+ let out=await readNumber(w,flat(makeCanvas(image)),seen);if(out.reason==='empty'){const data=await recognize(w,whole,'6'),hits=findCandidates(data);hits.forEach(h=>seen.add(h.number));if(hits.length===1&&atEdge(whole,hits[0].bbox))out={number:'',reason:'cut',canvas:whole,candidates:hits,raw:data.text};else if(hits.length===1){const confirm=await recognize(w,region(whole,hits[0].bbox),'7','0123456789');const exact=confirm.text.trim().replace(/\s/g,'');if(/^\d{6,12}$/.test(exact))seen.add(exact);out={number:confirm.text.trim()===hits[0].number&&hits[0].confidence>=40&&confirm.confidence>=40?hits[0].number:'',reason:'uncertain',canvas:whole,bbox:hits[0].bbox,candidates:hits,raw:data.text+'\n---\n'+confirm.text};if(out.number)out.reason='found';}else if(hits.length>1)out={number:'',reason:'ambiguous',canvas:whole,candidates:hits,raw:data.text};}
+ if(tilt)out={...out,tilt,path:'straightened'};
  if(attempts.length){const prior=attempts[0];const seen=new Set((prior.candidates||[]).map(c=>c.number));if(out.number&&seen.size&&!seen.has(out.number))return {...prior,number:'',reason:'uncertain',path:'full-frame-conflict'};if(out.number)return {...out,path:'full-frame-recovery'};return prior;}
  return out;
 }
 
 function paddedCanvas(c){
  const pad=Math.max(24,Math.round(Math.min(c.width,c.height)*.08)),out=document.createElement('canvas');out.width=c.width+pad*2;out.height=c.height+pad*2;
- const x=out.getContext('2d');x.fillStyle='white';x.fillRect(0,0,out.width,out.height);x.drawImage(c,pad,pad);return out;
+ const x=out.getContext('2d');x.fillStyle='white';x.fillRect(0,0,out.width,out.height);x.drawImage(c,pad,pad);out.pad=pad;return out;
 }
 async function recoverEmpty(w,image,out,seen){
  // Only retry an empty scan. Never override conflicting or ambiguous digits.
  if(out.number||out.reason!=='empty'||seen.size)return out;
- const c=makeCanvas(image,2400),attempts=[out.raw];
+ const c=out.tilt?rotated(makeCanvas(image,2400),out.tilt):makeCanvas(image,2400),attempts=[out.raw];
  for(const input of [paddedCanvas(c),paddedCanvas(contrast(c))]){
   const retry=await readNumber(w,input,seen);attempts.push(retry.raw);
   out={...retry,raw:attempts.join('\n---\n'),path:'empty-recovery'};
@@ -110,4 +122,4 @@ function recordOCR(result){
 }
 async function detect(w,image){const seen=new Set();let out=await detectPass(w,image,seen);out=await recoverEmpty(w,image,out,seen);if(out.number)seen.add(out.number);return {...out,...(seen.size>1?{number:'',reason:out.reason==='ambiguous'?'ambiguous':'uncertain',path:'scan-conflict'}:{}),observed:[...seen]};}
 
-async function detectCGC(w,image){const seen=new Set(),c=makeCanvas(image,2400);let out=await readNumber(w,c,seen);if(out.reason==='empty'){const d=await recognize(w,c,'6'),hits=findCandidates(d);hits.forEach(h=>seen.add(h.number));if(hits.length===1){const check=await recognize(w,region(c,hits[0].bbox),'7','0123456789');const exact=check.text.trim().replace(/\s/g,'');if(/^\d{6,12}$/.test(exact))seen.add(exact);out={number:exact===hits[0].number&&check.confidence>=40&&hits[0].confidence>=40?exact:'',reason:'uncertain',raw:d.text+'\n'+check.text,canvas:c};if(out.number)out.reason='found';}}return {...out,...(seen.size>1?{number:'',reason:'uncertain'}:{}),observed:[...seen]};}
+async function detectCGC(w,image){const seen=new Set(),c=makeCanvas(image,2400);let out=await readNumber(w,c,seen);if(out.reason==='empty'){const d=await recognize(w,c,'6'),hits=findCandidates(d);hits.forEach(h=>seen.add(h.number));if(hits.length===1&&atEdge(c,hits[0].bbox))out={number:'',reason:'cut',raw:d.text,canvas:c};else if(hits.length===1){const check=await recognize(w,region(c,hits[0].bbox),'7','0123456789');const exact=check.text.trim().replace(/\s/g,'');if(/^\d{6,12}$/.test(exact))seen.add(exact);out={number:exact===hits[0].number&&check.confidence>=40&&hits[0].confidence>=40?exact:'',reason:'uncertain',raw:d.text+'\n'+check.text,canvas:c};if(out.number)out.reason='found';}}return {...out,...(seen.size>1?{number:'',reason:'uncertain'}:{}),observed:[...seen]};}
