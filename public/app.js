@@ -59,11 +59,14 @@ function findView(photo,frame){
  if(best.r<.9)return 'did not match the view';if(best.k<1.2)return 'no larger than the video';
  const rw=frame.width*best.k,rh=frame.height*best.k,c=document.createElement('canvas');c.width=Math.round(rw);c.height=Math.round(rh);c.getContext('2d').drawImage(photo,(photo.width-rw)/2+best.sx*rw,(photo.height-rh)/2+best.sy*rh,rw,rh,0,0,c.width,c.height);return c;
 }
+// A photo too blurred to read is turned away before the slow read. In tests every readable photo scored .07 or more.
+const blurry=.05;
 // After 3 captures in a row without a usable still, stop asking for one until the camera is reopened.
 $('capture').onclick=$('shutter').onclick=async()=>{if(!stream||busy||pending)return;const g=generation,frame=captureVisibleFrame($('video'));if(!frame)return;busy=true;controls();
  const still=!window.ImageCapture?'not supported by this browser':stillMisses>=3?'stopped after 3 misses; reopen the camera to retry':(message('Taking the photo…'),await stillPhoto(stream.getVideoTracks()[0],frame));
  stillMisses=typeof still==='string'?stillMisses+1:0;busy=false;if(g!==generation){controls();message('Camera stopped.'+notMarked);return;}
  const image=typeof still==='string'?frame:still;$('photo-status').hidden=false;$('photo-status').textContent=image===frame?`Last capture: video frame ${frame.width}×${frame.height}. Full-resolution photo ${still}.`:`Last capture: full-resolution photo ${image.width}×${image.height} (video frame ${frame.width}×${frame.height}).`;
+ if(sharpness(image)<blurry){controls();message('The photo is blurry. Hold the phone steady and retake.'+notMarked,'bad');return;}
  void scan(image);};
 $('start').onclick=openCamera;$('camera-off').onclick=()=>$('start').click();$('stop').onclick=stopCamera;$('choose').onclick=()=>$('file').click();
 // scan() owns busy once it starts, so a stopped read is not unlocked again when it finally ends.

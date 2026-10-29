@@ -54,6 +54,15 @@ function contrast(c,scale=1){
  const out=document.createElement('canvas');out.width=c.width*scale;out.height=c.height*scale;const x=out.getContext('2d');x.drawImage(c,0,0,out.width,out.height);
  const im=x.getImageData(0,0,out.width,out.height);for(let i=0;i<im.data.length;i+=4){const gray=im.data[i]*.299+im.data[i+1]*.587+im.data[i+2]*.114;const v=Math.max(0,Math.min(255,(gray-145)*1.7+145));im.data[i]=im.data[i+1]=im.data[i+2]=v;}x.putImageData(im,0,0);return out;
 }
+// Blur check for camera photos: the steepest brightness steps between neighbouring pixels, as a share of the photo's
+// brightness range, at 480 px wide. Motion blur flattens the steps in one direction only, so the weaker direction counts.
+function sharpness(c){
+ const W=480,H=Math.max(2,Math.round(W*c.height/c.width)),o=document.createElement('canvas');o.width=W;o.height=H;const x=o.getContext('2d',{willReadFrequently:true});x.drawImage(c,0,0,W,H);
+ const d=x.getImageData(0,0,W,H).data,g=new Uint8Array(W*H),level=new Uint32Array(256),dx=new Uint32Array(256),dy=new Uint32Array(256);for(let i=0;i<g.length;i++){g[i]=d[i*4]*.299+d[i*4+1]*.587+d[i*4+2]*.114;level[g[i]]++;}
+ for(let y=0;y<H-1;y++)for(let i=y*W,end=i+W-1;i<end;i++){dx[Math.abs(g[i+1]-g[i])]++;dy[Math.abs(g[i+W]-g[i])]++;}
+ const at=(h,q)=>{let total=0,n=0;h.forEach(v=>total+=v);for(let v=0;v<256;v++)if((n+=h[v])>total*q)return v;return 255;};
+ return Math.min(at(dx,.995),at(dy,.995))/Math.max(1,at(level,.99)-at(level,.01));
+}
 // Two agreeing reads of the same pixels can share a misread (a blurred 2 read as 5 twice).
 // Re-read the number crop with more contrast, at full and double size; any different number makes the scan uncertain.
 // Black-and-white thresholding was tried and dropped: on blurred labels it turned a 9 into a 6.
