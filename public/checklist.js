@@ -1,7 +1,13 @@
 'use strict';
 // Location session: pick a location, tick its cards off by scanning, then review what was not scanned.
 window.rentalChecklist=(()=>{
- const nameKey='rental-scanner-name',store=window.rentalLocal;
+ const nameKey='rental-scanner-name',listKey='rental-card-list-collapsed',store=window.rentalLocal;
+ let listCollapsed=false;
+ function renderListVisibility(){
+  $('card-list-panel').hidden=listCollapsed;
+  $('toggle-card-list').setAttribute('aria-expanded',String(!listCollapsed));
+  $('toggle-card-list').textContent=listCollapsed?'Show card list':'Hide card list';
+ }
  let tab='todo',finishing=false,greeted=false,active=false,lastPoll=0,shownLocations='',counts=new Map();
  // While a session is open the list reloads so cards other phones synced show as scanned.
  const pollEvery=60000;
@@ -74,6 +80,12 @@ window.rentalChecklist=(()=>{
  }
  function poll(){if(!active||document.hidden)return;lastPoll=Date.now();void rentalBatch.poll();}
  function init(){
+  try{listCollapsed=localStorage.getItem(listKey)==='true';}catch{}
+  renderListVisibility();
+  $('toggle-card-list').onclick=()=>{
+   listCollapsed=!listCollapsed;renderListVisibility();
+   try{localStorage.setItem(listKey,String(listCollapsed));}catch{}
+  };
   try{$('scanner-name').value=localStorage.getItem(nameKey)||'';}catch{}
   $('begin').onclick=()=>void begin();$('location-select').onchange=()=>{$('start-error').textContent='';beginLabel();};$('scanner-name').oninput=()=>$('start-error').textContent='';
   for(const [id,name] of [['tab-todo','todo'],['tab-done','done']])$(id).onclick=()=>{tab=name;void render();};
