@@ -39,7 +39,7 @@ async function readNumber(w,c,seen=new Set(),inset=c.pad||0){
  const data=await recognize(w,c,'11'),hits=findCandidates(data),raw=[data.text];hits.forEach(h=>seen.add(h.number));
  if(hits.length!==1)return {number:'',reason:hits.length?'ambiguous':'empty',candidates:hits,canvas:c,raw:raw.join('\n')};
  if(atEdge(c,hits[0].bbox,inset))return {number:'',reason:'cut',bbox:hits[0].bbox,candidates:hits,canvas:c,raw:raw.join('\n')};
- const hit=hits[0],confirm=await recognize(w,region(c,hit.bbox),'7','0123456789');raw.push(confirm.text);const exact=confirm.text.trim().replace(/\s/g,'');if(/^\d{6,12}$/.test(exact))seen.add(exact);
+ const hit=hits[0],crop=region(c,hit.bbox),confirm=await recognize(w,crop,'7','0123456789');raw.push(confirm.text);const exact=confirm.text.trim().replace(/\s/g,'');if(/^\d{6,12}$/.test(exact))seen.add(exact);if(confirm.text.trim()===hit.number)await crossCheck(w,crop,seen,raw);
  return {number:seen.size===1&&confirm.text.trim()===hit.number&&hit.confidence>=40&&confirm.confidence>=40?hit.number:'',reason:seen.size===1&&confirm.text.trim()===hit.number&&hit.confidence>=40&&confirm.confidence>=40?'found':'uncertain',bbox:hit.bbox,candidates:hits,canvas:c,raw:raw.join('\n---\n')};
 }
 function numberZone(c){
@@ -50,10 +50,14 @@ function numberZone(c){
  out.getContext('2d').drawImage(c,box.x0,box.y0,out.width,out.height,0,0,out.width,out.height);
  return {canvas:out,box};
 }
-function contrast(c){
- const out=document.createElement('canvas');out.width=c.width;out.height=c.height;const x=out.getContext('2d');x.drawImage(c,0,0);
+function contrast(c,scale=1){
+ const out=document.createElement('canvas');out.width=c.width*scale;out.height=c.height*scale;const x=out.getContext('2d');x.drawImage(c,0,0,out.width,out.height);
  const im=x.getImageData(0,0,out.width,out.height);for(let i=0;i<im.data.length;i+=4){const gray=im.data[i]*.299+im.data[i+1]*.587+im.data[i+2]*.114;const v=Math.max(0,Math.min(255,(gray-145)*1.7+145));im.data[i]=im.data[i+1]=im.data[i+2]=v;}x.putImageData(im,0,0);return out;
 }
+// Two agreeing reads of the same pixels can share a misread (a blurred 2 read as 5 twice).
+// Re-read the number crop with more contrast, at full and double size; any different number makes the scan uncertain.
+// Black-and-white thresholding was tried and dropped: on blurred labels it turned a 9 into a 6.
+async function crossCheck(w,crop,seen,raw){for(const input of [contrast(crop),contrast(crop,2)]){const t=(await recognize(w,input,'7','0123456789')).text.trim().replace(/\s/g,'');raw?.push(t);if(/^\d{6,12}$/.test(t))seen.add(t);}}
 function numberLines(data){
  const hits=[];for(const block of data.blocks||[])for(const paragraph of block.paragraphs||[])for(const line of paragraph.lines||[]){
   const words=line.words||[],text=words.map(w=>w.text.trim()).join(' ');
@@ -73,7 +77,7 @@ async function retryLabel(w,c,first,seen=new Set((first.candidates||[]).map(h=>h
   if(hits.length!==1)continue;const hit=hits[0];if(atEdge(zone.canvas,hit.bbox))return {...first,reason:'cut',raw:raw.join('\n---\n'),path:'number-zone'};seen.add(hit.number);
   const check=await recognize(w,region(zone.canvas,hit.bbox),'7');raw.push(check.text);
   const exact=check.text.trim().replace(/\s/g,'');if(/^\d{6,12}$/.test(exact))seen.add(exact);
-  if(exact===hit.number&&hit.confidence>=50&&check.confidence>=50)agreed={...hit,bbox:{x0:hit.bbox.x0+zone.box.x0,y0:hit.bbox.y0+zone.box.y0,x1:hit.bbox.x1+zone.box.x0,y1:hit.bbox.y1+zone.box.y0}};
+  if(exact===hit.number&&hit.confidence>=50&&check.confidence>=50){await crossCheck(w,region(zone.canvas,hit.bbox),seen,raw);agreed={...hit,bbox:{x0:hit.bbox.x0+zone.box.x0,y0:hit.bbox.y0+zone.box.y0,x1:hit.bbox.x1+zone.box.x0,y1:hit.bbox.y1+zone.box.y0}};}
   if(agreed||seen.size>1)break;
  }
  if(seen.size>1)return {...first,number:'',reason:'uncertain',raw:raw.join('\n---\n'),path:'number-zone-conflict'};
@@ -95,7 +99,7 @@ async function detectPass(w,image,seen){
  if(attempts.some(a=>a.reason==='ambiguous'||a.reason==='cut'||a.path==='number-zone-conflict'))return attempts[0];
  // With no whole label, a tilted cut-off border still straightens the whole-frame read; the tilted original is not read first, so its partial digits cannot conflict.
  const tilt=!labels.length&&Math.abs(labels.tilt)>=1.5?labels.tilt:0,flat=c=>tilt?rotated(c,tilt):c,whole=flat(full);
- let out=await readNumber(w,flat(makeCanvas(image)),seen);if(out.reason==='empty'){const data=await recognize(w,whole,'6'),hits=findCandidates(data);hits.forEach(h=>seen.add(h.number));if(hits.length===1&&atEdge(whole,hits[0].bbox))out={number:'',reason:'cut',canvas:whole,candidates:hits,raw:data.text};else if(hits.length===1){const confirm=await recognize(w,region(whole,hits[0].bbox),'7','0123456789');const exact=confirm.text.trim().replace(/\s/g,'');if(/^\d{6,12}$/.test(exact))seen.add(exact);out={number:confirm.text.trim()===hits[0].number&&hits[0].confidence>=40&&confirm.confidence>=40?hits[0].number:'',reason:'uncertain',canvas:whole,bbox:hits[0].bbox,candidates:hits,raw:data.text+'\n---\n'+confirm.text};if(out.number)out.reason='found';}else if(hits.length>1)out={number:'',reason:'ambiguous',canvas:whole,candidates:hits,raw:data.text};}
+ let out=await readNumber(w,flat(makeCanvas(image)),seen);if(out.reason==='empty'){const data=await recognize(w,whole,'6'),hits=findCandidates(data);hits.forEach(h=>seen.add(h.number));if(hits.length===1&&atEdge(whole,hits[0].bbox))out={number:'',reason:'cut',canvas:whole,candidates:hits,raw:data.text};else if(hits.length===1){const confirm=await recognize(w,region(whole,hits[0].bbox),'7','0123456789');const exact=confirm.text.trim().replace(/\s/g,'');if(/^\d{6,12}$/.test(exact))seen.add(exact);if(exact===hits[0].number)await crossCheck(w,region(whole,hits[0].bbox),seen);out={number:confirm.text.trim()===hits[0].number&&hits[0].confidence>=40&&confirm.confidence>=40?hits[0].number:'',reason:'uncertain',canvas:whole,bbox:hits[0].bbox,candidates:hits,raw:data.text+'\n---\n'+confirm.text};if(out.number)out.reason='found';}else if(hits.length>1)out={number:'',reason:'ambiguous',canvas:whole,candidates:hits,raw:data.text};}
  if(tilt)out={...out,tilt,path:'straightened'};
  if(attempts.length){const prior=attempts[0];const seen=new Set((prior.candidates||[]).map(c=>c.number));if(out.number&&seen.size&&!seen.has(out.number))return {...prior,number:'',reason:'uncertain',path:'full-frame-conflict'};if(out.number)return {...out,path:'full-frame-recovery'};return prior;}
  return out;
@@ -122,4 +126,4 @@ function recordOCR(result){
 }
 async function detect(w,image){const seen=new Set();let out=await detectPass(w,image,seen);out=await recoverEmpty(w,image,out,seen);if(out.number)seen.add(out.number);return {...out,...(seen.size>1?{number:'',reason:out.reason==='ambiguous'?'ambiguous':'uncertain',path:'scan-conflict'}:{}),observed:[...seen]};}
 
-async function detectCGC(w,image){const seen=new Set(),c=makeCanvas(image,2400);let out=await readNumber(w,c,seen);if(out.reason==='empty'){const d=await recognize(w,c,'6'),hits=findCandidates(d);hits.forEach(h=>seen.add(h.number));if(hits.length===1&&atEdge(c,hits[0].bbox))out={number:'',reason:'cut',raw:d.text,canvas:c};else if(hits.length===1){const check=await recognize(w,region(c,hits[0].bbox),'7','0123456789');const exact=check.text.trim().replace(/\s/g,'');if(/^\d{6,12}$/.test(exact))seen.add(exact);out={number:exact===hits[0].number&&check.confidence>=40&&hits[0].confidence>=40?exact:'',reason:'uncertain',raw:d.text+'\n'+check.text,canvas:c};if(out.number)out.reason='found';}}return {...out,...(seen.size>1?{number:'',reason:'uncertain'}:{}),observed:[...seen]};}
+async function detectCGC(w,image){const seen=new Set(),c=makeCanvas(image,2400);let out=await readNumber(w,c,seen);if(out.reason==='empty'){const d=await recognize(w,c,'6'),hits=findCandidates(d);hits.forEach(h=>seen.add(h.number));if(hits.length===1&&atEdge(c,hits[0].bbox))out={number:'',reason:'cut',raw:d.text,canvas:c};else if(hits.length===1){const check=await recognize(w,region(c,hits[0].bbox),'7','0123456789');const exact=check.text.trim().replace(/\s/g,'');if(/^\d{6,12}$/.test(exact))seen.add(exact);if(exact===hits[0].number)await crossCheck(w,region(c,hits[0].bbox),seen);out={number:exact===hits[0].number&&check.confidence>=40&&hits[0].confidence>=40?exact:'',reason:'uncertain',raw:d.text+'\n'+check.text,canvas:c};if(out.number)out.reason='found';}}return {...out,...(seen.size>1?{number:'',reason:'uncertain'}:{}),observed:[...seen]};}
