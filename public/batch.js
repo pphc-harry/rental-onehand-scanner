@@ -8,8 +8,8 @@ window.rentalBatch=(()=>{
  const isText=value=>value.trim().length>0&&value.length<=60&&!/[\u0000-\u001f\u007f]/.test(value);
  // A card belongs to its New Location (D) once one is set, otherwise to its Location (B).
  const where=row=>String(row.newLocation??'').trim()||String(row.location??'').trim();
- // Cards ticked in C after the session started were scanned on another phone (or another app). Sessions without a baseline count none.
- const scannedElsewhere=session=>{const base=session.ticked&&new Set(session.ticked);return row=>!!base&&!!row.checked&&!base.has(row.number);};
+ // A card ticked in C is already scanned: before this check started, or on another phone during it.
+ const scannedElsewhere=()=>row=>!!row.checked;
  function locations(snapshot){const counts=new Map();for(const r of snapshot?.rows||[]){const l=where(r);if(isText(l))counts.set(l,(counts.get(l)||0)+1);}return [...counts].map(([name,count])=>({name,count})).sort((a,b)=>a.name.localeCompare(b.name,undefined,{numeric:true}));}
  async function render(){
   const [snapshot,queue]=await Promise.all([store.snapshot(),store.queue()]);

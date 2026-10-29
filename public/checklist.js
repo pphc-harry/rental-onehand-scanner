@@ -36,11 +36,11 @@ window.rentalChecklist=(()=>{
   if(!active)return renderStart(d.snapshot);
   $('cl-title').textContent=d.session.location;$('cl-who').textContent=`${d.session.name} · ${d.done.length} scanned · since ${time(d.session.startedAt)}`;
   const scanned=d.done.length+d.team.length;
-  $('cl-progress').textContent=`${scanned} / ${d.cards.length} scanned`;$('cl-team').textContent=d.team.length?`· ${d.team.length} on other phones`:'';
+  $('cl-progress').textContent=`${scanned} / ${d.cards.length} scanned`;$('cl-team').textContent=d.team.length?`· ${d.team.length} already in Sheet`:'';
   $('cl-bar').max=Math.max(1,d.cards.length);$('cl-bar').value=scanned;$('finish-location').classList.toggle('ready',!!d.cards.length&&!d.todo.length);
   $('tab-todo').textContent=`To scan ${d.todo.length}`;$('tab-done').textContent=`Scanned ${scanned}`;
   for(const [id,name] of [['tab-todo','todo'],['tab-done','done']])$(id).setAttribute('aria-pressed',String(tab===name));
-  const rows=tab==='todo'?d.todo.map(r=>item(r,d.queued.has(r.number)?'Waiting to sync':r.checked?'✓ in Sheet':'')):d.done.sort((a,b)=>d.mine.get(b.number).at-d.mine.get(a.number).at).map(r=>{const q=d.queued.get(r.number);return item(r,`${time(d.mine.get(r.number).at)} · ${q?(q.conflict?'Needs review':'Waiting to sync'):'Synced'}`);}).concat(d.team.map(r=>item(r,'Other phone')));
+  const rows=tab==='todo'?d.todo.map(r=>item(r,d.queued.has(r.number)?'Waiting to sync':'')):d.done.sort((a,b)=>d.mine.get(b.number).at-d.mine.get(a.number).at).map(r=>{const q=d.queued.get(r.number);return item(r,`${time(d.mine.get(r.number).at)} · ${q?(q.conflict?'Needs review':'Waiting to sync'):'Synced'}`);}).concat(d.team.map(r=>item(r,'In Sheet')));
   $('card-list').replaceChildren(...(rows.length?rows:[empty(tab==='todo'?(d.cards.length?'Every card on this list is scanned.':'No cards at this location in the downloaded list.'):'Nothing scanned yet.')]));
  }
  async function begin(){
@@ -52,7 +52,7 @@ window.rentalChecklist=(()=>{
   try{
    await rentalBatch.reload();
    if(!rentalBatch.locations(await store.snapshot()).some(l=>l.name===location)){$('start-error').textContent='That location is no longer in the Sheet. Choose again.';return;}
-   tab='todo';lastPoll=Date.now();await store.setSession({id:crypto.randomUUID(),name,location,startedAt:Date.now(),ticked:(await store.snapshot()).rows.filter(r=>r.checked).map(r=>r.number)});await rentalBatch.render();
+   tab='todo';lastPoll=Date.now();await store.setSession({id:crypto.randomUUID(),name,location,startedAt:Date.now()});await rentalBatch.render();
    message(`Checking ${location}. Opening the camera…`);void openCamera();
   }catch{$('start-error').textContent='Local storage failed. Try again.';}
   finally{$('begin').disabled=false;}
@@ -62,8 +62,8 @@ window.rentalChecklist=(()=>{
  async function openFinish(){
   const d=await data();if(!d.session)return;
   $('finish-title').textContent=`Finish ${d.session.location}?`;
-  $('finish-scanned').textContent=d.done.length;$('finish-team').textContent=d.team.length;$('finish-missing').textContent=d.todo.length;$('finish-earlier').textContent=d.todo.filter(r=>r.checked).length;
-  $('missing-list').replaceChildren(...(d.todo.length?d.todo.map(r=>item(r,r.checked?'✓ in Sheet':'')):[empty('Every card on this list is scanned.')]));
+  $('finish-scanned').textContent=d.done.length;$('finish-team').textContent=d.team.length;$('finish-missing').textContent=d.todo.length;
+  $('missing-list').replaceChildren(...(d.todo.length?d.todo.map(r=>item(r,'')):[empty('Every card on this list is scanned.')]));
   $('finish-status').textContent=waitingText(d);$('finish-anyway').hidden=true;$('finish-sync').textContent=d.waiting.length?'Sync & finish':'Finish';
   $('finish').hidden=false;$('finish').showModal();
  }
