@@ -62,3 +62,5 @@ dialog.sheet{width:100%;max-width:520px;max-height:calc(100dvh - 24px);margin:au
 #review #review-status:is([data-tone="ok"],[data-tone="bad"]){font-size:14px!important;line-height:1.4;font-weight:600;padding:10px 12px;border:1px solid currentColor;border-radius:10px;background:color-mix(in srgb,currentColor 12%,transparent)}
 #review #number[data-tone="bad"]{font-family:inherit;font-size:clamp(26px,8vw,36px);font-weight:700}
 #review #read-source{text-align:center;margin:0 0 8px}#read-source:empty{display:none}
+/* A blurred capture: red box and a banner on the view itself. Fixed colours, since they sit on the camera picture in both themes. */
+.retake-cue{position:absolute;top:8px;left:56px;right:56px;z-index:1;margin:0 auto;width:fit-content;padding:6px 14px;border-radius:999px;background:#b42318;color:#fff;font-size:14px;font-weight:700;line-height:1.3;text-align:center;pointer-events:none}#camera.retake~.guide{border:3px solid #ff5a4f;box-shadow:0 0 0 100vmax #5a0b064d}
