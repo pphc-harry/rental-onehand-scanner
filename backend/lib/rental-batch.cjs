@@ -33,7 +33,9 @@ async function sync(items,google){
   if(['row','location','card'].some(k=>item.expected[k]!==found[k])){results.push({...result,status:'changed'});continue;}
   const newLocation=item.newLocation.trim();
   if(found.checked&&found.highlighted&&found.newLocation===newLocation){results.push({...result,status:'already_checked',match:found});continue;}
-  if(['checked','highlighted','newLocation'].some(k=>item.expected[k]!==found[k])){results.push({...result,status:'changed'});continue;}
+  // Ticked with this D but no green: an earlier write of this card lost its fill. Write it again (same C and D, plus the green) instead of reporting changed.
+  const unfinished=found.checked&&!found.highlighted&&found.newLocation===newLocation;
+  if(!unfinished&&['checked','highlighted','newLocation'].some(k=>item.expected[k]!==found[k])){results.push({...result,status:'changed'});continue;}
   writes.push({item,found,newLocation});
   requests.push({updateCells:{range:{sheetId:TAB_ID,startRowIndex:found.row-1,endRowIndex:found.row,startColumnIndex:2,endColumnIndex:4},rows:[{values:[{userEnteredValue:{boolValue:true}},{userEnteredValue:{stringValue:newLocation}}]}],fields:'userEnteredValue'}});
   requests.push({repeatCell:{range:{sheetId:TAB_ID,startRowIndex:found.row-1,endRowIndex:found.row,startColumnIndex:2,endColumnIndex:3},cell:{userEnteredFormat:{backgroundColorStyle:{rgbColor:{red:0,green:1,blue:0}}}},fields:'userEnteredFormat.backgroundColorStyle'}});

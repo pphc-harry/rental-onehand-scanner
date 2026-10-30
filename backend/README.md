@@ -8,4 +8,4 @@ Install dependencies with `cd backend && npm ci`. A separate Vercel project must
 
 Excluded: credentials, .env files, .vercel project bindings, node_modules, photos, real Sheet snapshots, operational QA logs, backup files and generated archives. No deployment or Google Sheet mutation is performed by this source import. Historical operational README/AUDIT files are not deployment instructions.
 
-Run `npm run check` from repository root for frontend and backend syntax checks. Run `node scripts/test-rental.cjs` for mocked rental write safety tests, including missing green format rejection. No real Sheet writes occur in these tests.
+Run `npm run check` from repository root for frontend and backend syntax checks. Run `node scripts/test-rental.cjs` for mocked rental write safety tests, including missing green format rejection. Run `node scripts/test-rental-batch.cjs` for the batch sync path, including a card left ticked without green by an earlier write. No real Sheet writes occur in these tests.
