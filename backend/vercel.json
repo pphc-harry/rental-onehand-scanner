@@ -1,0 +1,1 @@
+{"functions":{"api/inventory.js":{"maxDuration":60},"api/scans.js":{"maxDuration":60},"api/purchases.js":{"maxDuration":60},"api/rental.js":{"maxDuration":60}},"routes":[{"src":"/(?:lib(?:/.*)?|package\\.json|vercel\\.json)","status":404},{"handle":"filesystem"}]}

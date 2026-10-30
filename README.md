@@ -26,7 +26,7 @@ Run `python3 -m http.server 8080 --directory public` and open http://localhost:8
 
 ## Deployment and backend boundary
 
-Vercel serves `public/` using `vercel.json`. `/api/rental` is rewritten to the existing shared backend at https://psa-number-scanner.vercel.app/api/rental. The shared backend source and credentials are not part of this frontend repository. It remains independently deployed.
+Vercel serves `public/` using `vercel.json`. `/api/rental` is rewritten to the existing shared backend at https://psa-number-scanner.vercel.app/api/rental. The complete retained shared backend source is now in `backend/`, including `api/rental.js`, `lib/rental.cjs`, `lib/rental-batch.cjs`, Google API helpers, and the original inventory/purchases endpoints and scanner page. Credentials are excluded. The backend remains independently deployed; the root frontend rewrite is unchanged. See `backend/README.md`.
 
 Creating this repository does not connect Vercel Git integration or enable automatic PR preview/production deployments. Keep the current production project and domain. Before using a new preview origin for matching/sync, verify the shared backend origin policy; arbitrary preview domains are not guaranteed to work. Do not remove origin restrictions or copy credentials into the repository.
 

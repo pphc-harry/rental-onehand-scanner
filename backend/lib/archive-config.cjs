@@ -1,0 +1,1 @@
+module.exports={"folderId": "1DmwefdY_Z3eXHldkP8aePSTIXIMSuSbu", "sheetId": "1zlqUWmJeivpGkX2VRGT6q6zpoZYO6lZK-KcUFWBZtTU", "columns": ["scan_id", "captured_at_utc", "received_at_utc", "ocr_number", "ocr_reason", "inventory_status", "buy_sheet_row", "photo_link", "ocr_ms", "sheet_ms", "candidates", "source", "version", "updated_at_utc"]};

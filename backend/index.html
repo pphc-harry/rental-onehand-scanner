@@ -1,0 +1,277 @@
+<!doctype html>
+<html lang="zh-Hant" data-theme="dark"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#f4f5ef"><title>PSA 編號掃描</title>
+<script>try{document.documentElement.dataset.theme=localStorage.getItem("scanner-theme")||"dark"}catch{}</script><style>
+:root{color-scheme:light;--ink:#172f2c;--sub:#52635e;--paper:#f4f5ef;--line:#c5d0c9;--green:#145c48;--surface:#fff;--image:#e9ede8;--warning:#6d4600;--success:#104834;--error:#921b1b}*{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.5 system-ui,sans-serif}main{max-width:720px;margin:auto;padding:16px 12px max(32px,env(safe-area-inset-bottom))}header{display:flex;align-items:baseline;justify-content:space-between;border-bottom:1px solid var(--line);padding-bottom:16px}h1{font-size:24px;letter-spacing:-.5px;margin:0}p{color:var(--sub);margin:12px 0}.small{font-size:13px;color:var(--sub)}button,input{font:inherit;border:1px solid var(--line);border-radius:8px;min-height:48px;padding:10px 16px;background:var(--surface);color:var(--ink)}button{cursor:pointer}button.primary{background:var(--green);color:white;border-color:var(--green);font-weight:600}button:disabled{opacity:.5;cursor:default}:focus-visible{outline:3px solid #b46400;outline-offset:3px}.actions{display:flex;gap:8px;margin:16px 0}.actions button{flex:1}#take{width:100%;min-height:58px;font-size:19px}#choose{display:block;margin:8px auto 0;background:transparent;border-color:transparent;min-height:44px}#status{min-height:48px;margin:16px 0;font-size:14px}#result{background:var(--surface);border:1px solid var(--line);padding:20px;border-radius:12px;margin:16px 0}#number{font:700 clamp(28px,8vw,42px)/1.3 ui-monospace,monospace;letter-spacing:1px;overflow-wrap:anywhere;margin:8px 0}#preview{display:block;width:100%;max-height:310px;object-fit:contain;background:var(--image);border-radius:6px}#timing{font-size:13px}details{border-top:1px solid var(--line);padding-top:16px;margin-top:24px}summary{cursor:pointer;min-height:44px;color:var(--sub)}label{display:block;font-size:14px;margin-top:12px}input{width:100%;margin-top:8px}#stats{font-size:14px}#history{padding-left:24px;font-size:14px;color:var(--sub)}#history li{padding:4px 0;overflow-wrap:anywhere}[hidden]{display:none!important}footer{font-size:12px;color:var(--sub);margin-top:24px}
+#camera-view{margin:16px 0;background:#172f2c;border-radius:8px;overflow:hidden}#video{display:block;width:100%;height:62vh;min-height:340px;max-height:680px;object-fit:contain;background:#102320}#camera-view{position:relative}#capture{position:absolute;inset:0 0 36px;width:100%;border:0;border-radius:0;background:transparent;touch-action:manipulation}#capture:disabled{opacity:1}#capture span{position:absolute;bottom:18px;left:50%;transform:translateX(-50%);white-space:nowrap;background:#172f2ce8;color:white;padding:10px 16px;border-radius:24px}#sheet-state{padding:14px;border:2px solid #a77715;background:#fff5d9;border-radius:8px;font-weight:650}#sheet-state[data-state="checked"]{background:#e3f4e8;border-color:#145c48;color:#104834}#sheet-state[data-state="not_found"]{background:#ffebeb;border-color:#ac2020;color:#921b1b}#connection{font-size:13px}#camera-hint{margin:0;padding:8px 12px;color:white;font-size:13px}#stop{width:100%;margin-top:8px}
+#camera-receipt{position:absolute;top:12px;left:12px;right:12px;margin:0;padding:12px;background:#fff5d9;color:#6d4600;border:2px solid #a77715;border-radius:8px;pointer-events:none;font-weight:700;font-size:16px;z-index:2}#camera-receipt[data-state="not_found"]{background:#ffebeb;color:#921b1b;border-color:#ac2020}#camera-receipt[data-state="checked"]{background:#e3f4e8;color:#104834;border-color:#145c48}.scan-strip{display:flex;gap:10px;overflow-x:auto;overscroll-behavior-x:contain;padding:4px 2px 12px;scroll-snap-type:x proximity}.scan-card{flex:0 0 258px;display:flex;gap:12px;align-items:center;padding:12px;background:var(--surface);border:1px solid var(--line);border-radius:10px;scroll-snap-align:start;min-height:100px}.scan-card img{width:62px;height:80px;object-fit:contain;background:var(--image);border-radius:4px}.scan-card .scan-code{font:650 17px/1.4 ui-monospace,monospace;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}.scan-card .scan-status{margin:5px 0 0;font-size:13px;color:#6d4600}.scan-card[data-state="checked"]{border-color:#145c48}.scan-card[data-state="checked"] .scan-status{color:#104834}.scan-card[data-state="failed"]{border-color:#ac2020}.scan-card[data-state="failed"] .scan-status{color:#921b1b}#scan-tray{margin:12px 0}#scan-tray p.small{margin:0 0 6px}
+:root[data-theme="dark"]{color-scheme:dark;--ink:#e6eeeb;--sub:#acbcb6;--paper:#101715;--line:#394b43;--green:#206d53;--surface:#1b2722;--image:#26352e;--warning:#f3d397;--success:#a7ebbe;--error:#ffb8b8}header{gap:12px;align-items:center}#theme-toggle{min-width:92px;font-size:14px;padding:8px 12px}h1{letter-spacing:normal}#archive-state{padding:10px 0;font-size:14px}#archive-state[data-state="failed"]{color:var(--error)}.scan-card .scan-status{color:var(--warning)}.scan-card[data-state="checked"] .scan-status{color:var(--success)}.scan-card[data-state="failed"] .scan-status{color:var(--error)}.archive-status{font-size:12px;color:var(--sub);margin:4px 0 0}:root[data-theme="dark"] #sheet-state,:root[data-theme="dark"] #camera-receipt{background:#352d1c;color:#f3d397;border-color:#947638}:root[data-theme="dark"] #sheet-state[data-state="checked"],:root[data-theme="dark"] #camera-receipt[data-state="checked"]{background:#173b2b;color:#a7ebbe;border-color:#42885b}:root[data-theme="dark"] #sheet-state[data-state="not_found"],:root[data-theme="dark"] #camera-receipt[data-state="not_found"]{background:#401f24;color:#ffb8b8;border-color:#a85862}.scan-card[data-state="checked"]{border-color:#42885b}.scan-card[data-state="failed"]{border-color:#a85862}#archive-retry{margin-bottom:12px}:focus-visible{outline-color:#dfaf55}@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}
+</style></head><body><main>
+<header><h1>PSA 編號掃描</h1><button id="theme-toggle" type="button" aria-pressed="true" aria-label="切換深色模式">深色模式</button></header>
+<p id="connection" role="status">檢查 Sheet 連線…</p>
+<form id="access-form" hidden><p class="small" role="status">未能確認 Sheet 連線，請重試。</p><button id="connect-access" type="submit">重新連接 Sheet</button></form>
+<p>開鏡頭，對準 PSA 標籤，再點畫面拍攝。<br>鏡頭保持開啟，讀完直接核對庫存。盤點期間請勿排序或插刪庫存行。</p>
+<section id="camera-view" aria-label="即時鏡頭" hidden><video id="video" autoplay muted playsinline aria-label="PSA 標籤即時預覽"></video><button id="capture" aria-label="拍攝目前畫面並掃描" disabled><span>點畫面拍攝掃描</span></button><p id="camera-receipt" role="status" hidden></p><p id="camera-hint">一張卡一次，標籤放近啲，避開反光。</p></section>
+<section id="scan-tray" aria-label="拍攝紀錄" hidden><p class="small">最新喺左邊 · 向右滑睇紀錄 · 保留最近 100 張</p><div id="scan-strip" class="scan-strip" tabindex="0" role="region" aria-label="可左右捲動的卡片紀錄"></div></section>
+<button id="take" class="primary">開鏡頭掃描</button><button id="stop" hidden>停止鏡頭</button><button id="choose">由相簿揀</button>
+<input id="file" aria-label="選擇 PSA 相片" type="file" accept="image/*" hidden>
+<p id="archive-state" role="status">相片會保存至團隊 Drive，供盤點覆核。</p><button id="archive-retry" hidden>重試保存今次掃描</button><p id="status" role="status" aria-live="polite">首次請允許網頁使用鏡頭。</p>
+<section id="result" aria-label="辨識結果" hidden><span id="result-label" class="small">讀到嘅編號 · 請核對實物</span><div id="number"></div><p id="sheet-state" data-state="pending" role="status" aria-live="polite" hidden></p><p id="timing"></p><canvas id="preview" aria-label="相片與自動找到的編號位置"></canvas><div class="actions"><button id="copy">複製編號</button></div></section>
+<details id="benchmark"><summary>測試準確率 / 匯出紀錄</summary><p class="small">每次辨識自動記錄，包括讀唔到。填實物編號先會計準確率；未核對唔當正確。</p><label for="truth">今次實物正確編號</label><input id="truth" inputmode="numeric" autocomplete="off" placeholder="睇實物輸入，保留開頭嘅 0" disabled><div class="actions"><button id="grade" disabled>核對今次</button></div><p id="stats">未有紀錄</p><div class="actions"><button id="export" disabled>匯出 CSV</button><button id="clear" disabled>清除</button></div><ol id="history" reversed></ol><p class="small">點拍模式只讀取點擊當刻嘅相片；辨識時間與 Sheet 核對分開記錄。首次引擎載入另列。完整掃描相片及結果另存團隊 Drive／紀錄 Sheet；下面係今次頁面嘅核對統計。</p></details>
+<footer>OCR 喺裝置處理；掃描相片（最長邊 2400px JPEG）及結果會保存至團隊 Drive，供覆核。<br>首次需要下載辨識引擎。核對 Buy Sheet：B 欄編號 → D 欄打勾及黃色標記。<br><span id="version">v13 · 共用掃描、相片保存及深色模式</span></footer>
+</main><script src="https://cdn.jsdelivr.net/npm/tesseract.js@6.0.1/dist/tesseract.min.js"></script><script>
+'use strict';
+const $=id=>document.getElementById(id),records=[];
+let worker=null,loading=null,busy=false,current=null,pendingScan=null;
+function applyTheme(){const dark=document.documentElement.dataset.theme==='dark';$('theme-toggle').textContent=dark?'淺色模式':'深色模式';$('theme-toggle').setAttribute('aria-pressed',String(dark));document.querySelector('meta[name="theme-color"]').content=dark?'#101715':'#f4f5ef';}
+$('theme-toggle').onclick=()=>{document.documentElement.dataset.theme=document.documentElement.dataset.theme==='dark'?'light':'dark';try{localStorage.setItem('scanner-theme',document.documentElement.dataset.theme);}catch{}applyTheme();};applyTheme();
+async function scanRequest(body){const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),55000);try{const r=await fetch('/api/scans',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),signal:controller.signal});const d=await r.json();if(!r.ok)throw Error(d.status==='unauthorized'?'連線未獲接受，請重新整理。':'保存未能確認，請重試。');return d;}finally{clearTimeout(timer);}}
+function archiveState(record,text,failed=false){if(record.tile?.archive)record.tile.archive.textContent=text;if(current===record||pendingScan===record){$('archive-state').textContent=text;$('archive-state').dataset.state=failed?'failed':'pending';}}
+function beginScan(image,source){
+ const timestamp=new Date().toISOString(),canvas=makeCanvas(image,2400);let imageData=canvas.toDataURL('image/jpeg',.92);
+ if(imageData.length>3900000)imageData=canvas.toDataURL('image/jpeg',.8);
+ const r={timestamp,source,predicted:'',expected:'',scanMs:0,totalMs:0,loadMs:0,raw:'',reason:'error',tile:addScanCard(image),imageData,archiveStatus:'pending'};
+ records.push(r);current=r;pendingScan=r;archiveState(r,'相片上傳中…');
+ r.upload=uploadScan(r).then(()=>true,()=>false);return r;
+}
+async function uploadScan(r){
+ if(!r.ticket)r.ticket=(await scanRequest({action:'prepare',capturedAt:r.timestamp,source:r.source})).ticket;
+ r.scanId=r.ticket.id;
+ const d=await scanRequest({action:'upload',ticket:r.ticket,image:r.imageData});if(d.status!=='photo_saved')throw Error('相片保存未完成。');r.photoSaved=true;archiveState(r,'相片已保存 · 等待辨識結果');
+}
+async function finalizeScan(r){
+ const uploaded=await r.upload;if(!uploaded&&!r.photoSaved)throw Error('相片未保存，未寫入庫存。');
+ const d=await scanRequest({action:'finalize',id:r.scanId,ocr:{number:r.predicted,reason:r.reason,candidates:r.observed||[],raw:r.raw,scanMs:r.scanMs}});
+ if(d.archive!=='saved'||!['checked','not_found','duplicate','ocr_conflict','ocr_failed','unverified'].includes(d.status))throw Error('掃描紀錄未能確認保存。');
+ r.archiveStatus='saved';r.imageData=null;pendingScan=null;$('archive-retry').hidden=true;archiveState(r,'相片及結果已保存 · 紀錄 Sheet 更新中');
+ void pollAudit(r);return d;
+}
+async function pollAudit(r){for(let i=0;i<4;i++){await new Promise(resolve=>setTimeout(resolve,2000*(i+1)));try{const d=await scanRequest({action:'status',id:r.scanId});if(d.audit==='saved'){archiveState(r,'✓ 相片及紀錄 Sheet 已保存');return;}}catch{}}archiveState(r,'相片及結果已保存 · Sheet 待同步');}
+async function finishEvidence(r){
+ try{const d=await finalizeScan(r);r.sheetStatus=d.status;updateScanCard(r.tile,r.predicted,'failed',r.reason==='cancelled'?'已中斷 · 未寫入':'✕ 辨識失敗 · 未寫入');}
+ catch{saveFailed(r);}finally{controls();refresh();}
+}
+function saveFailed(r){pendingScan=r;r.archiveStatus='unverified';$('archive-retry').hidden=false;archiveState(r,'保存未完成，請重試；未確認前請勿關閉頁面。',true);message('請先重試保存今次掃描。庫存結果未確認時，唔會自動重寫。');controls();}
+async function runScan(r,image,session){
+ const started=performance.now();let out;
+ try{out=await detect(await engine(),image);}catch(e){await failScan(r,e);return;}
+ Object.assign(r,{predicted:out.number,reason:out.reason,raw:out.raw,observed:out.observed||[],scanMs:Math.round(performance.now()-started),totalMs:Math.round(performance.now()-started)});
+ if(session&&live!==session){r.predicted='';r.reason='cancelled';await finishEvidence(r);return;}
+ current=r;$('number').textContent=out.number||'未讀清楚編號';$('result-label').textContent=out.number?'今次讀到嘅編號 · 請核對實物':'請調整角度再拍';$('timing').textContent='辨識 '+(r.scanMs/1000).toFixed(2)+' 秒';preview(out.canvas,out.bbox);$('copy').hidden=!out.number;$('result').hidden=false;
+ if(out.number){await checkInventory(r);if(r.archiveStatus!=='saved')saveFailed(r);}
+ else{sheetState('warning','未讀清楚／號碼衝突 · 未寫入庫存');await finishEvidence(r);}
+ refresh();controls();
+}
+async function failScan(r,e){r.reason='error';r.error='辨識中斷';r.predicted='';await finishEvidence(r);message('未能辨識，請檢查保存狀態後重拍。');}
+$('archive-retry').onclick=async()=>{const r=pendingScan;if(!r||busy||liveBusy||sheetBusy)return;$('archive-retry').disabled=true;lock(true);try{if(!r.photoSaved){r.upload=uploadScan(r).then(()=>true,()=>false);if(!await r.upload)throw Error();}if(r.predicted)await checkInventory(r);else await finishEvidence(r);if(r.archiveStatus!=='saved')saveFailed(r);}catch{saveFailed(r);}finally{$('archive-retry').disabled=false;lock(false);}};
+addEventListener('beforeunload',e=>{if(pendingScan){e.preventDefault();e.returnValue='';}});
+
+const message=t=>$('status').textContent=t;
+function lock(value){busy=value;controls();}
+function deadline(p,ms,onTimeout){let timer;return Promise.race([p,new Promise((_,reject)=>{timer=setTimeout(()=>{onTimeout?.();reject(Error('處理逾時，請檢查網絡後再影一次。'));},ms);})]).finally(()=>clearTimeout(timer));}
+async function engine(){if(worker)return worker;if(!loading){loading=(async()=>{if(!window.Tesseract)throw Error('辨識引擎未能下載，請檢查網絡後重新整理。');let cancelled=false;const init=Tesseract.createWorker('eng',1,{errorHandler:()=>{}}).then(w=>{if(cancelled){w.terminate();throw Error('引擎載入逾時');}return w;});const w=await deadline(init,60000,()=>{cancelled=true;});worker=w;return w;})().catch(e=>{loading=null;throw e;});}return loading;}
+function makeCanvas(image,maxEdge=1800){const sw=image.naturalWidth||image.width,sh=image.naturalHeight||image.height;if(!sw||!sh)throw Error('未能讀取相片，請試 JPG 或 PNG。');const scale=Math.min(2,maxEdge/Math.max(sw,sh));const c=document.createElement('canvas');c.width=Math.round(sw*scale);c.height=Math.round(sh*scale);const x=c.getContext('2d');x.fillStyle='white';x.fillRect(0,0,c.width,c.height);x.drawImage(image,0,0,c.width,c.height);return c;}
+function wordsOf(data){return (data.blocks||[]).flatMap(b=>(b.paragraphs||[]).flatMap(p=>(p.lines||[]).flatMap(l=>l.words||[])));}
+function findCandidates(data){const found=new Map();for(const w of wordsOf(data)){const number=w.text.trim();if(/^\d{6,12}$/.test(number)){const prior=found.get(number);if(!prior||w.confidence>prior.confidence)found.set(number,{number,confidence:w.confidence,bbox:w.bbox});}}return [...found.values()];}
+async function recognize(w,c,mode,whitelist=''){await w.setParameters({tessedit_pageseg_mode:mode,tessedit_char_whitelist:whitelist,user_defined_dpi:'300'});return (await deadline(w.recognize(c,{}, {text:true,blocks:true}),30000,()=>{w.terminate();worker=null;loading=null;})).data;}
+function region(c,b){const h=b.y1-b.y0,pad=Math.max(8,h*.45),left=Math.max(0,b.x0-pad),top=Math.max(0,b.y0-pad),right=Math.min(c.width,b.x1+pad),bottom=Math.min(c.height,b.y1+pad);const out=document.createElement('canvas');const scale=Math.min(3,70/Math.max(h,1));out.width=Math.ceil((right-left)*scale);out.height=Math.ceil((bottom-top)*scale);out.getContext('2d').drawImage(c,left,top,right-left,bottom-top,0,0,out.width,out.height);return out;}
+// Find connected red label borders at a bounded resolution, then deskew before OCR.
+function labelRegions(source){
+ const scale=Math.min(1,900/Math.max(source.width,source.height)),w=Math.round(source.width*scale),h=Math.round(source.height*scale);
+ const small=document.createElement('canvas');small.width=w;small.height=h;const sx=small.getContext('2d',{willReadFrequently:true});sx.drawImage(source,0,0,w,h);
+ const pixels=sx.getImageData(0,0,w,h).data,mask=new Uint8Array(w*h),queue=new Int32Array(w*h),labels=[];
+ for(let i=0;i<mask.length;i++){const r=pixels[i*4],g=pixels[i*4+1],b=pixels[i*4+2];mask[i]=r>100&&r>g*1.28&&r>b*1.12?1:0;}
+ for(let start=0;start<mask.length;start++){
+  if(!mask[start])continue;let head=0,tail=1,minX=w,minY=h,maxX=0,maxY=0;queue[0]=start;mask[start]=0;
+  while(head<tail){const p=queue[head++],x=p%w,y=Math.floor(p/w);minX=Math.min(minX,x);maxX=Math.max(maxX,x);minY=Math.min(minY,y);maxY=Math.max(maxY,y);
+   for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){const nx=x+dx,ny=y+dy;if(nx<0||ny<0||nx>=w||ny>=h)continue;const n=ny*w+nx;if(mask[n]){mask[n]=0;queue[tail++]=n;}}
+  }
+  const bw=maxX-minX,bh=maxY-minY;if(tail<100||bw<75||bw/bh<1.7||bw/bh>7)continue;
+  const tops=new Float64Array(bw+1).fill(h),bottoms=new Float64Array(bw+1).fill(-1);
+  for(let j=0;j<tail;j++){const p=queue[j],x=p%w-minX,y=Math.floor(p/w);tops[x]=Math.min(tops[x],y);bottoms[x]=Math.max(bottoms[x],y);}
+  // The hologram interrupts the lower red border. Columns containing only the
+  // upper edge must not be fitted as the bottom edge (which inverted the crop).
+  const fit=values=>{let n=0,a=0,b=0,c=0,d=0;for(let x=Math.ceil(bw*.08);x<bw*.92;x++){const y=values[x];if(y<0||y>=h||bottoms[x]-tops[x]<bh*.35)continue;n++;a+=x;b+=y;c+=x*x;d+=x*y;}const m=n>=bw*.15?(n*d-a*b)/(n*c-a*a):NaN;return {m,k:(b-m*a)/n};};
+  const top=fit(tops),bottom=fit(bottoms);const slope=(top.m+bottom.m)/2,angle=Math.atan(slope),centerX=(minX+maxX)/2,centerY=(top.k+bottom.k)/2+slope*bw/2;
+  const height=(bottom.k-top.k+(bottom.m-top.m)*bw/2)*Math.cos(angle);if(!Number.isFinite(angle)||height<15||bw/height<2||bw/height>7||Math.abs(top.m-bottom.m)>.3)continue;
+  const crop=document.createElement('canvas');crop.width=1400;crop.height=Math.round(height/bw*1400+160);const ctx=crop.getContext('2d');ctx.fillStyle='white';ctx.fillRect(0,0,crop.width,crop.height);
+  ctx.translate(crop.width/2,crop.height/2);const zoom=1400/(bw/scale);ctx.scale(zoom,zoom);ctx.rotate(-angle);ctx.drawImage(source,-centerX/scale,-centerY/scale);
+  const sample=ctx.getImageData(140,Math.floor(crop.height*.2),1120,Math.floor(crop.height*.6)).data;let neutral=0;for(let i=0;i<sample.length;i+=4){const r=sample[i],g=sample[i+1],b=sample[i+2];if(Math.min(r,g,b)>135&&Math.max(r,g,b)-Math.min(r,g,b)<65)neutral++;}if(neutral/(sample.length/4)<.4)continue;
+  labels.push({canvas:crop,area:bw*height,angle:angle*180/Math.PI});
+ }
+ return labels.sort((a,b)=>b.area-a.area).slice(0,4);
+}
+async function readNumber(w,c,seen=new Set()){
+ const data=await recognize(w,c,'11'),hits=findCandidates(data),raw=[data.text];hits.forEach(h=>seen.add(h.number));
+ if(hits.length!==1)return {number:'',reason:hits.length?'ambiguous':'empty',candidates:hits,canvas:c,raw:raw.join('\n')};
+ const hit=hits[0],confirm=await recognize(w,region(c,hit.bbox),'7','0123456789');raw.push(confirm.text);const exact=confirm.text.trim().replace(/\s/g,'');if(/^\d{6,12}$/.test(exact))seen.add(exact);
+ return {number:seen.size===1&&confirm.text.trim()===hit.number&&hit.confidence>=40&&confirm.confidence>=40?hit.number:'',reason:seen.size===1&&confirm.text.trim()===hit.number&&hit.confidence>=40&&confirm.confidence>=40?'found':'uncertain',bbox:hit.bbox,candidates:hits,canvas:c,raw:raw.join('\n---\n')};
+}
+function numberZone(c){
+ // PSA certificate sits in the lower-right label area. Keep the entire line,
+ // including leading zeros; these are layout ratios, never fixture coordinates.
+ const box={x0:Math.floor(c.width*.45),y0:Math.floor(c.height*.51),x1:Math.floor(c.width*.99),y1:Math.floor(c.height*.94)};
+ const out=document.createElement('canvas');out.width=box.x1-box.x0;out.height=box.y1-box.y0;
+ out.getContext('2d').drawImage(c,box.x0,box.y0,out.width,out.height,0,0,out.width,out.height);
+ return {canvas:out,box};
+}
+function contrast(c){
+ const out=document.createElement('canvas');out.width=c.width;out.height=c.height;const x=out.getContext('2d');x.drawImage(c,0,0);
+ const im=x.getImageData(0,0,out.width,out.height);for(let i=0;i<im.data.length;i+=4){const gray=im.data[i]*.299+im.data[i+1]*.587+im.data[i+2]*.114;const v=Math.max(0,Math.min(255,(gray-145)*1.7+145));im.data[i]=im.data[i+1]=im.data[i+2]=v;}x.putImageData(im,0,0);return out;
+}
+function numberLines(data){
+ const hits=[];for(const block of data.blocks||[])for(const paragraph of block.paragraphs||[])for(const line of paragraph.lines||[]){
+  const words=line.words||[],text=words.map(w=>w.text.trim()).join(' ');
+  if(!/^\d[\d\s]*$/.test(text))continue;const number=text.replace(/\s/g,'');if(!/^\d{6,12}$/.test(number))continue;
+  // Reject separate number groups separated by more than a character height.
+  if(words.some((w,i)=>i&&w.bbox.x0-words[i-1].bbox.x1>Math.max(w.bbox.y1-w.bbox.y0,words[i-1].bbox.y1-words[i-1].bbox.y0)))continue;
+  hits.push({number,confidence:Math.min(...words.map(w=>w.confidence)),bbox:{x0:Math.min(...words.map(w=>w.bbox.x0)),y0:Math.min(...words.map(w=>w.bbox.y0)),x1:Math.max(...words.map(w=>w.bbox.x1)),y1:Math.max(...words.map(w=>w.bbox.y1))}});
+ }return hits;
+}
+async function retryLabel(w,c,first,seen=new Set((first.candidates||[]).map(h=>h.number))){
+ if(first.number||first.reason==='ambiguous')return first;
+ const zone=numberZone(c),raw=[first.raw];let agreed=null;
+ // Always enter this path when the first pass is empty, even without an OCR bbox.
+ for(const [input,mode,whitelist] of [[zone.canvas,'6',''],[contrast(zone.canvas),'6','0123456789']]){
+  const data=await recognize(w,input,mode,whitelist);raw.push(data.text);const hits=numberLines(data);
+  if(hits.length>1)return {...first,reason:'ambiguous',raw:raw.join('\n---\n'),path:'number-zone'};
+  if(hits.length!==1)continue;const hit=hits[0];seen.add(hit.number);
+  const check=await recognize(w,region(zone.canvas,hit.bbox),'7');raw.push(check.text);
+  const exact=check.text.trim().replace(/\s/g,'');if(/^\d{6,12}$/.test(exact))seen.add(exact);
+  if(exact===hit.number&&hit.confidence>=50&&check.confidence>=50)agreed={...hit,bbox:{x0:hit.bbox.x0+zone.box.x0,y0:hit.bbox.y0+zone.box.y0,x1:hit.bbox.x1+zone.box.x0,y1:hit.bbox.y1+zone.box.y0}};
+  if(agreed||seen.size>1)break;
+ }
+ if(seen.size>1)return {...first,number:'',reason:'uncertain',raw:raw.join('\n---\n'),path:'number-zone-conflict'};
+ return agreed?{number:agreed.number,reason:'found',bbox:agreed.bbox,candidates:[agreed],canvas:c,raw:raw.join('\n---\n'),path:'number-zone'}:{...first,raw:raw.join('\n---\n'),path:'number-zone-failed'};
+}
+async function detectPass(w,image,seen){
+ const full=makeCanvas(image,2400),labels=labelRegions(full),found=[],attempts=[];
+ for(const label of labels){const first=await readNumber(w,label.canvas,seen);const out=labels.length===1?await retryLabel(w,label.canvas,first,seen):first;out.angle=label.angle;attempts.push(out);if(out.number)found.push(out);}
+ // Multiple separated labels remain ambiguous even when they carry the same number.
+ if(found.length>1)return {number:'',reason:'ambiguous',canvas:full,candidates:found.flatMap(r=>r.candidates),raw:attempts.map(r=>r.raw).join('\n---\n')};
+ if(found.length===1&&labels.length===1)return found[0];
+ if(labels.length>1)return {number:'',reason:'ambiguous',canvas:full,candidates:found.flatMap(r=>r.candidates),raw:attempts.map(r=>r.raw).join('\n---\n')};
+ // A failed crop may recover from original pixels, but conflicting candidates
+ // or multiple labels must never be silently replaced with another number.
+ if(attempts.some(a=>a.reason==='ambiguous'||a.path==='number-zone-conflict'))return attempts[0];
+ let out=await readNumber(w,makeCanvas(image),seen);if(out.reason==='empty'){const data=await recognize(w,full,'6'),hits=findCandidates(data);hits.forEach(h=>seen.add(h.number));if(hits.length===1){const confirm=await recognize(w,region(full,hits[0].bbox),'7','0123456789');const exact=confirm.text.trim().replace(/\s/g,'');if(/^\d{6,12}$/.test(exact))seen.add(exact);out={number:confirm.text.trim()===hits[0].number&&hits[0].confidence>=40&&confirm.confidence>=40?hits[0].number:'',reason:'uncertain',canvas:full,bbox:hits[0].bbox,candidates:hits,raw:data.text+'\n---\n'+confirm.text};if(out.number)out.reason='found';}else if(hits.length>1)out={number:'',reason:'ambiguous',canvas:full,candidates:hits,raw:data.text};}
+ if(attempts.length){const prior=attempts[0];const seen=new Set((prior.candidates||[]).map(c=>c.number));if(out.number&&seen.size&&!seen.has(out.number))return {...prior,number:'',reason:'uncertain',path:'full-frame-conflict'};if(out.number)return {...out,path:'full-frame-recovery'};return prior;}
+ return out;
+}
+
+async function detect(w,image){const seen=new Set(),out=await detectPass(w,image,seen);if(out.number)seen.add(out.number);return {...out,...(seen.size>1?{number:'',reason:'uncertain',path:'scan-conflict'}:{}),observed:[...seen]};}
+function preview(c,bbox){const p=$('preview');p.width=c.width;p.height=c.height;const x=p.getContext('2d');x.drawImage(c,0,0);if(bbox){const pad=8;x.strokeStyle='#145c48';x.lineWidth=Math.max(3,c.width/250);x.strokeRect(bbox.x0-pad,bbox.y0-pad,bbox.x1-bbox.x0+pad*2,bbox.y1-bbox.y0+pad*2);}}
+function percentile(values,p){if(!values.length)return null;const a=[...values].sort((a,b)=>a-b);return a[Math.max(0,Math.ceil(a.length*p)-1)];}
+function refresh(){const graded=records.filter(r=>r.expected),correct=graded.filter(r=>r.expected===r.predicted).length,times=records.filter(r=>!r.error).map(r=>r.scanMs);$('stats').textContent=records.length?`共 ${records.length} 次 · 已核對 ${graded.length} 次 · 正確率 ${graded.length?(correct/graded.length*100).toFixed(1)+'%':'—'} · 辨識中位數 ${times.length?(percentile(times,.5)/1000).toFixed(2)+'s':'—'}`:'未有紀錄';$('export').disabled=$('clear').disabled=!records.length;$('history').replaceChildren();for(const r of [...records].reverse().slice(0,20)){const li=document.createElement('li');li.textContent=`${r.predicted||'未讀到'} · ${r.expected?(r.expected===r.predicted?'正確':'錯誤，實物 '+r.expected):'未核對'} · ${(r.scanMs/1000).toFixed(2)}s`;$('history').append(li);}}
+async function processFile(file){
+ if(busy||sheetBusy||pendingScan||!file)return;lock(true);resetLiveResult();message('讀取相片…');let url,record;
+ try{url=URL.createObjectURL(file);const im=new Image();im.src=url;await deadline(im.decode(),15000);record=beginScan(im,'photo');await runScan(record,im);}
+ catch(e){message('未能讀取相片，請重試。');if(record)await failScan(record,e);}
+ finally{if(url)URL.revokeObjectURL(url);lock(false);}
+}
+// Stop invalidates late camera/OCR results. A submitted Sheet write is allowed to
+// finish and report its receipt; closing the camera cannot cancel a committed write.
+let live=null,stream=null,liveBusy=false,generation=0,sheetBusy=false;
+// Retire old employee fragments from shared links; no credential is needed.
+if(location.hash.startsWith('#access='))history.replaceState(null,'',location.pathname+location.search);
+try{sessionStorage.removeItem('scanner-access');}catch{}
+async function inventoryRequest(options={},ms=45000){
+ const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),ms);
+ try{const response=await fetch('/api/inventory',{...options,signal:controller.signal});return {response,data:await response.json()};}finally{clearTimeout(timer);}
+}
+
+function addScanCard(image){
+ const card=document.createElement('article');card.className='scan-card';card.dataset.state='pending';
+ const img=document.createElement('img');img.alt='今次拍攝嘅卡片';img.src=makeCanvas(image,180).toDataURL('image/jpeg',.65);
+ const info=document.createElement('div'),code=document.createElement('div'),status=document.createElement('p'),archive=document.createElement('p');archive.className='archive-status';archive.textContent='相片待保存';code.className='scan-code';status.className='scan-status';status.setAttribute('role','status');info.append(code,status,archive);card.append(img,info);
+ $('scan-strip').prepend(card);while($('scan-strip').children.length>100)$('scan-strip').lastElementChild.remove();$('scan-tray').hidden=false;$('scan-strip').scrollLeft=0;
+ const tile={card,code,status,archive};updateScanCard(tile,'','pending','辨識中…');return tile;
+}
+function updateScanCard(tile,number,state,label){if(!tile)return;tile.code.textContent=number|| (state==='pending'?'辨識中…':'未讀到編號');tile.status.textContent=label;tile.card.dataset.state=state;tile.card.setAttribute('aria-busy',String(state==='pending'));}
+function finishScanCard(record){const status=record.sheetStatus;
+ const map={checked:['checked','✓ 成功 · 已剔選及標黃'],not_found:['failed','✕ 沒有這張卡'],duplicate:['warning','重複編號 · 未寫入'],unauthorized:['warning','未授權 · 未寫入'],not_configured:['warning','Sheet 未啟用 · 未寫入']};
+ const [state,label]=map[status]||['warning','未能確認儲存 · 請覆核'];updateScanCard(record.tile,record.predicted,state,label);
+}
+
+function controls(){
+ const blocked=busy||liveBusy||sheetBusy||!!pendingScan||live?.phase==='opening';
+ $('take').disabled=!!blocked;$('capture').disabled=!!blocked||live?.phase!=='ready';
+ $('choose').disabled=$('file').disabled=!!blocked||!!live;
+ $('grade').disabled=$('truth').disabled=!!blocked||!current;$('clear').disabled=!!blocked||!records.length;
+ $('stop').hidden=!live;$('take').textContent=live?(live.phase==='opening'?'開啟鏡頭中…':blocked?'處理中…':'拍攝掃描'):'開鏡頭掃描';
+ $('capture').querySelector('span').textContent=blocked?'處理中…':'點畫面拍攝掃描';
+}
+function sheetState(state,text){$('sheet-state').hidden=false;$('sheet-state').dataset.state=state;$('sheet-state').textContent=text;$('camera-receipt').hidden=false;$('camera-receipt').dataset.state=state;$('camera-receipt').textContent=(current?.predicted?current.predicted+' · ':'')+text;}
+let connectionGeneration=0;
+async function connection(){
+ const generation=++connectionGeneration;
+ $('access-form').hidden=true;
+ $('connection').textContent='連接 Sheet 中…';
+ try{
+  const {response:r,data:d}=await inventoryRequest({method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({number:'000000000000',dryRun:true})});
+  if(generation!==connectionGeneration)return false;
+  const ok=r.ok&&['matched_read_only','not_found','duplicate'].includes(d.status);
+  $('connection').textContent=ok?'✓ 共用掃描器 · Sheet 已連接':d.status==='unauthorized'?'連線未獲接受 · 請重新整理':'未能確認 Sheet 連線 · 請重新連接';
+  $('access-form').hidden=ok;if(ok)void scanRequest({action:'recover'}).catch(()=>{});return ok;
+ }catch{if(generation===connectionGeneration){$('connection').textContent='未能確認 Sheet 連線 · 請重新連接';$('access-form').hidden=false;}return false;}
+}
+$('access-form').onsubmit=async e=>{
+ e.preventDefault();if(busy||liveBusy||sheetBusy)return;
+ $('connect-access').disabled=true;
+ try{const ok=await connection();if(ok)message(pendingScan?'Sheet 已連接。請按「重試保存今次掃描」。':'Sheet 已連接。可以開始掃描。');}
+ finally{$('connect-access').disabled=false;}
+};
+async function checkInventory(record){
+ sheetBusy=true;controls();sheetState('pending','核對緊 Buy Sheet…');const started=performance.now();
+ try{
+  const d=await finalizeScan(record);const r={ok:!!d};
+  record.sheetStatus=d.status;record.sheetRow=d.row||'';
+  if(d.status==='checked'&&r.ok){sheetState('checked','✓ 已核對 · 第 '+d.row+' 行 D 欄已打勾及標黃');message('已儲存。換卡後再點畫面掃描。');}
+  else if(d.status==='not_found'&&r.ok){sheetState('not_found','✕ 沒有這張卡 · Buy Sheet 搵唔到 '+record.predicted);message('請核對實物編號；Sheet 冇新增或修改紀錄。');}
+  else if(d.status==='duplicate'){sheetState('warning','同一編號有 '+d.count+' 行 · 未寫入，請人工核對');}
+  else if(d.status==='not_configured'){sheetState('warning','Sheet 尚未啟用 · 今次未核對、未寫入');}
+  else if(d.status==='unauthorized'){$('access-form').hidden=false;$('connection').textContent='連線未獲接受 · 請重新整理';sheetState('warning','連線未獲接受 · 請重新整理');}
+  else{sheetState('warning','未能確認儲存結果 · 請檢查 Sheet 後重試');}
+ }catch{record.sheetStatus='unverified';sheetState('warning','連線中斷／逾時 · 未能確認是否已寫入，請檢查 Sheet');}
+ finally{finishScanCard(record);record.sheetMs=Math.round(performance.now()-started);if(record.sheetStatus==='checked')message('已儲存 · Sheet 核對 '+(record.sheetMs/1000).toFixed(2)+' 秒。換卡後再點畫面掃描。');sheetBusy=false;controls();refresh();}
+}
+function stopLive(note=''){
+ generation++;live=null;if(stream)stream.getTracks().forEach(t=>t.stop());stream=null;
+ $('video').pause();$('video').srcObject=null;$('camera-view').hidden=true;controls();if(note)message(note);
+}
+function resetLiveResult(){current=null;$('result').hidden=true;$('sheet-state').hidden=true;$('camera-receipt').hidden=true;$('number').textContent='';$('truth').value='';}
+async function startLive(){
+ if(busy||liveBusy||sheetBusy||pendingScan)return;if(live?.phase==='ready'){await capture();return;}if(live)return;
+ resetLiveResult();
+ if(!window.isSecureContext||!navigator.mediaDevices?.getUserMedia){message('請用 Safari / Chrome 開此 HTTPS 網址，或者由相簿揀圖。');return;}
+ const session={id:++generation,phase:'opening'};live=session;controls();message('請允許網頁使用鏡頭…');
+ try{
+  const request=navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:{ideal:'environment'},width:{ideal:1920},height:{ideal:1080}}}).then(s=>{if(live!==session){s.getTracks().forEach(t=>t.stop());return null;}return s;});
+  const acquired=await deadline(request,25000,()=>{if(live===session)stopLive('開鏡頭逾時，請確認權限後重試。');});
+  if(!acquired||live!==session)return;stream=acquired;
+  stream.getVideoTracks()[0].addEventListener('ended',()=>{if(live===session)stopLive('鏡頭已中斷，請重新開啟。');});
+  $('camera-view').hidden=false;$('video').muted=true;$('video').srcObject=stream;
+  await deadline($('video').play(),12000);if(live!==session)return;
+  message('鏡頭已開啟，準備辨識引擎…');await engine();if(live!==session)return;
+  session.phase='ready';controls();message('對準標籤，點畫面拍攝掃描。');
+ }catch(e){if(live!==session)return;const errors={NotAllowedError:'未獲准使用鏡頭，請允許相機權限。Discord 內開唔到可改用 Safari。',NotFoundError:'搵唔到鏡頭，可以由相簿揀圖。',NotReadableError:'鏡頭暫時用唔到，請關閉其他使用鏡頭嘅程式。'};stopLive(errors[e.name]||'未能開鏡頭：'+e.message);}
+}
+async function capture(){
+ if(busy||liveBusy||sheetBusy||pendingScan||live?.phase!=='ready')return;
+ const session=live,video=$('video');if(video.readyState<2||!video.videoWidth){message('鏡頭準備中，請稍後再點。');return;}
+ liveBusy=true;controls();resetLiveResult();let record;
+ try{const frame=document.createElement('canvas'),scale=Math.min(1,2400/Math.max(video.videoWidth,video.videoHeight));frame.width=Math.round(video.videoWidth*scale);frame.height=Math.round(video.videoHeight*scale);frame.getContext('2d').drawImage(video,0,0,frame.width,frame.height);record=beginScan(frame,'tap-camera');await runScan(record,frame,session);}
+ catch(e){if(record)await failScan(record,e);else message('拍攝失敗，請重試。');}
+ finally{liveBusy=false;controls();}
+}
+$('take').onclick=()=>void startLive();$('capture').onclick=()=>void capture();$('stop').onclick=()=>stopLive('鏡頭已停止。');$('choose').onclick=()=>$('file').click();
+$('file').onchange=e=>{const f=e.target.files[0];e.target.value='';if(!live&&!liveBusy&&!sheetBusy&&!pendingScan)void processFile(f);};
+document.addEventListener('visibilitychange',()=>{if(document.hidden&&live)stopLive('已暫停鏡頭，撳一下重新開始。');});window.addEventListener('pagehide',()=>stopLive());
+void connection();
+$('copy').onclick=async()=>{if(!current?.predicted)return;try{await navigator.clipboard.writeText(current.predicted);$('copy').textContent='已複製';}catch{message('未能自動複製，請長按上面嘅編號複製。');}};
+$('grade').onclick=()=>{if(!current||busy)return;const truth=$('truth').value.trim();if(!/^\d{6,12}$/.test(truth)){message('請輸入實物上完整嘅 6–12 位編號。');return;}current.expected=truth;refresh();message(current.predicted===truth?'已核對：編號正確。':'已記錄今次讀錯／讀唔到，可以影下一張。');};
+$('export').onclick=()=>{const keys=['timestamp','predicted','expected','correct','scanMs','loadMs','totalMs','reason','error','raw','source','frames','sheetStatus','sheetRow','sheetMs','scanId','archiveStatus'];const quote=v=>'"'+String(v??'').replace(/^[=+@-]/,"'$&").replace(/"/g,'""')+'"';const csv='\ufeff'+[keys.join(','),...records.map(r=>keys.map(k=>quote(k==='correct'?(r.expected?String(r.predicted===r.expected):''):r[k])).join(','))].join('\r\n');const url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));const a=document.createElement('a');a.href=url;a.download='psa-number-benchmark.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),10000);};
+$('clear').onclick=()=>{if(pendingScan)return;if(confirm('清除今次所有測試紀錄？')){records.length=0;$('scan-strip').replaceChildren();$('scan-tray').hidden=true;current=null;$('result').hidden=true;$('truth').value='';refresh();lock(false);}};
+window.ScannerCore={findCandidates,percentile,detect};
+// Start downloading while the user frames the photo; never require a preload button.
+setTimeout(()=>{void engine().catch(()=>{});},500);
+</script></body></html>
