@@ -27,7 +27,10 @@ function labelRegions(source){
   const height=(bottom.k-top.k+(bottom.m-top.m)*bw/2)*Math.cos(angle);if(!Number.isFinite(angle)||height<15||!partial&&bw/height<2||bw/height>7||Math.abs(top.m-bottom.m)>(partial?.05:.3))continue;
   const crop=document.createElement('canvas');crop.width=1400;crop.height=Math.round(height/bw*1400+160);const ctx=crop.getContext('2d');ctx.fillStyle='white';ctx.fillRect(0,0,crop.width,crop.height);
   ctx.translate(crop.width/2,crop.height/2);const zoom=1400/(bw/scale);ctx.scale(zoom,zoom);ctx.rotate(-angle);ctx.drawImage(source,-centerX/scale,-centerY/scale);
-  const sample=ctx.getImageData(140,Math.floor(crop.height*.2),1120,Math.floor(crop.height*.6)).data;let neutral=0;for(let i=0;i<sample.length;i+=4){const r=sample[i],g=sample[i+1],b=sample[i+2];if(Math.min(r,g,b)>135&&Math.max(r,g,b)-Math.min(r,g,b)<65)neutral++;}if(neutral/(sample.length/4)<.4)continue;
+  // The inside must be mostly light grey label paper. Dim indoor light can leave the paper near 120 (a clear label was turned away
+  // on 30 Oct by a fixed 135), so the bar is 80% of the paper's own level, between 90 and 135. Well-lit labels keep 135.
+  const sample=ctx.getImageData(140,Math.floor(crop.height*.2),1120,Math.floor(crop.height*.6)).data,level=new Uint32Array(256);let grey=0;for(let i=0;i<sample.length;i+=4){const r=sample[i],g=sample[i+1],b=sample[i+2],lo=Math.min(r,g,b);if(Math.max(r,g,b)-lo<65){level[lo]++;grey++;}}
+  let paper=0;for(let v=255,n=0;v>=0;v--)if((n+=level[v])>=grey*.1){paper=v;break;}const bar=Math.floor(Math.max(90,Math.min(135,paper*.8)));let neutral=0;for(let v=bar+1;v<256;v++)neutral+=level[v];if(neutral/(sample.length/4)<.4)continue;
   if(partial){tilts.push({area:bw*height,angle:angle*180/Math.PI});continue;}
   labels.push({canvas:crop,area:bw*height,angle:angle*180/Math.PI});
  }
